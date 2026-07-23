@@ -9,6 +9,7 @@ const {
   getOrCreateWeekState,
   markTaskDone,
   isWeekFullyDone,
+  resetWeek,
 } = require("./lib/rotation");
 const {
   buildDutyFlex,
@@ -141,11 +142,16 @@ async function handlePostback(event) {
   if (!week) return;
 
   const task = week.tasks.find((t) => t.id === Number(taskId));
+  const flex = buildDutyFlex({
+    title: `✅ ${name} 完成了「${task.label}」`,
+    weekKey,
+    groupName: week.groupName,
+    members: week.members,
+    tasks: week.tasks,
+  });
   await client.replyMessage({
     replyToken: event.replyToken,
-    messages: [
-      { type: "text", text: `✅ 已回報完成：${task.label}（${name}）` },
-    ],
+    messages: [flex],
   });
 
   if (isWeekFullyDone(week)) {
@@ -167,6 +173,30 @@ async function handleTextMessage(event) {
       groupName: week.groupName,
       members: week.members,
       tasks: week.tasks,
+    });
+    return client.replyMessage({
+      replyToken: event.replyToken,
+      messages: [flex],
+    });
+  }
+
+  // 重設本週值日勾選（清空所有工作的完成狀態，重新開始）
+  if (text === "/reset" || text === "/重設") {
+    const weekKey = getWeekKey();
+    const week = await resetWeek(weekKey);
+    if (!week) {
+      return client.replyMessage({
+        replyToken: event.replyToken,
+        messages: [{ type: "text", text: "目前沒有本週的值日紀錄可以重設。" }],
+      });
+    }
+    const flex = buildDutyFlex({
+      title: `🔄 ${name} 重設了本週值日`,
+      weekKey,
+      groupName: week.groupName,
+      members: week.members,
+      tasks: week.tasks,
+      footerNote: "所有工作已重新標記為未完成，可以重新開始勾選。",
     });
     return client.replyMessage({
       replyToken: event.replyToken,
