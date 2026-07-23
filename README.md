@@ -149,13 +149,79 @@ LINE 現在的流程改成要先建立「LINE 官方帳號」，再從官方帳�
 - `/todo 完成 3`：把編號 3 的待辦標記完成
 - `/groupid`：查詢目前群組的 groupId（設定時用）
 
-## 本機測試
+## Local Development & Testing
+
+Install everything first:
 
 ```bash
 npm install
-LINE_CHANNEL_ACCESS_TOKEN=xxx LINE_CHANNEL_SECRET=xxx CRON_SECRET=xxx \
-UPSTASH_REDIS_REST_URL=xxx UPSTASH_REDIS_REST_TOKEN=xxx npm start
 ```
 
-需要用 [ngrok](https://ngrok.com/) 之類的工具把本機的 `/webhook` 暴露到外網，
-才能在 LINE Developers Console 設定 Webhook URL 做測試。
+This adds a few dedicated scripts so you can test each part locally without deploying to Render every time.
+
+### 1. Test the rotation logic only (no network needed at all)
+
+```bash
+npm run test:rotation
+```
+
+Prints the current on-duty group and a 6-week rotation preview. Good for checking `config.js` changes (like `ROTATION_START_MONDAY` or `ROTATION_GROUPS`) instantly.
+
+### 2. Test the Upstash Redis connection
+
+```bash
+UPSTASH_REDIS_REST_URL=xxx UPSTASH_REDIS_REST_TOKEN=xxx npm run test:db
+```
+
+Reads your current stored state, does a round-trip write/read to confirm the connection works, then cleans up after itself — your real data isn't touched.
+
+### 3. Run the server locally with auto-restart on save
+
+```bash
+LINE_CHANNEL_ACCESS_TOKEN=xxx LINE_CHANNEL_SECRET=xxx CRON_SECRET=xxx \
+LINE_GROUP_ID=your-test-group-id \
+UPSTASH_REDIS_REST_URL=xxx UPSTASH_REDIS_REST_TOKEN=xxx \
+npm run dev
+```
+
+Uses `nodemon`, so it restarts automatically whenever you save a file. **Use your test group's ID here, not the real household group's**, to avoid spamming your roommates while you're debugging.
+
+### 4. Trigger a specific reminder manually (no LINE webhook / no tunnel needed)
+
+With the server from step 3 running, open another terminal and run any of:
+
+```bash
+CRON_SECRET=xxx npm run cron:weekly-kickoff
+CRON_SECRET=xxx npm run cron:midweek
+CRON_SECRET=xxx npm run cron:weekend
+CRON_SECRET=xxx npm run cron:monthly-todo
+```
+
+Each one POSTs to the matching `/cron/*` endpoint on your local server, exactly like GitHub Actions would — the message goes straight to your test group. `CRON_SECRET` here must match the one you started the server with in step 3.
+
+### 5. Test buttons/commands (needs a public URL pointing at your local server)
+
+Only required for testing things LINE sends _to_ you — tapping the "完成" button or typing a command in the group. Use a temporary tunnel:
+
+```bash
+# Option A: cloudflared (no account needed, fastest to set up)
+npm run tunnel
+
+# Option B: ngrok (needs a free account)
+ngrok http 3000
+```
+
+Either gives you a temporary public URL like `https://xxxx.trycloudflare.com`. Then:
+
+1. Go to LINE Developers Console → Messaging API → Webhook URL, temporarily set it to `https://xxxx.trycloudflare.com/webhook`
+2. Click Verify to confirm it succeeds
+3. Tap buttons / type commands in your test group and watch your local terminal logs
+4. **Remember to switch the Webhook URL back to your Render URL afterward**, or your production bot will stop receiving events
+
+### Recommended workflow
+
+1. Make your change
+2. `npm run test:rotation` and/or `npm run test:db` for pure logic/data changes
+3. `npm run dev` + `npm run cron:*` to test outbound messages
+4. Only spin up a tunnel (step 5) if you touched button/command handling
+5. Once it all works locally, commit and push — Render will redeploy automatically

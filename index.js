@@ -129,6 +129,15 @@ async function handleEvent(event) {
 }
 
 async function handlePostback(event) {
+  // TEMPORARY DEBUG: set DEBUG_SIMULATE_DELAY_MS in .env to simulate slow processing
+  // const debugDelay = Number(process.env.DEBUG_SIMULATE_DELAY_MS || 0);
+  // if (debugDelay > 0) {
+  //   console.log(
+  //     `[DEBUG] Simulating a ${debugDelay}ms delay before processing...`,
+  //   );
+  //   await new Promise((resolve) => setTimeout(resolve, debugDelay));
+  // }
+
   const data = new URLSearchParams(event.postback.data);
   const action = data.get("action");
   if (action !== "done") return;
@@ -248,26 +257,46 @@ function checkCronSecret(req, res) {
 
 app.post("/cron/weekly-kickoff", express.json(), async (req, res) => {
   if (!checkCronSecret(req, res)) return;
-  await sendWeeklyKickoff();
-  res.send("ok");
+  try {
+    await sendWeeklyKickoff();
+    res.send("ok");
+  } catch (e) {
+    console.error("weekly-kickoff failed:", e);
+    res.status(500).send("error");
+  }
 });
 
 app.post("/cron/midweek", express.json(), async (req, res) => {
   if (!checkCronSecret(req, res)) return;
-  await sendMidweekOrWeekendReminder("週間");
-  res.send("ok");
+  try {
+    await sendMidweekOrWeekendReminder("週間");
+    res.send("ok");
+  } catch (e) {
+    console.error("midweek reminder failed:", e);
+    res.status(500).send("error");
+  }
 });
 
 app.post("/cron/weekend", express.json(), async (req, res) => {
   if (!checkCronSecret(req, res)) return;
-  await sendMidweekOrWeekendReminder("週末");
-  res.send("ok");
+  try {
+    await sendMidweekOrWeekendReminder("週末");
+    res.send("ok");
+  } catch (e) {
+    console.error("weekend reminder failed:", e);
+    res.status(500).send("error");
+  }
 });
 
 app.post("/cron/monthly-todo", express.json(), async (req, res) => {
   if (!checkCronSecret(req, res)) return;
-  await sendMonthlyTodoReminder();
-  res.send("ok");
+  try {
+    await sendMonthlyTodoReminder();
+    res.send("ok");
+  } catch (e) {
+    console.error("monthly todo reminder failed:", e);
+    res.status(500).send("error");
+  }
 });
 
 app.get("/", (req, res) => res.send("OhanaMeansFamily is running"));

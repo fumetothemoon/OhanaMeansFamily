@@ -4,12 +4,24 @@
   "description": "LINE 群組值日生提醒機器人",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node -r dotenv/config index.js",
+    "dev": "nodemon -r dotenv/config index.js",
+    "test:rotation": "node -r dotenv/config scripts/test-rotation.js",
+    "test:db": "node -r dotenv/config scripts/test-db.js",
+    "cron:weekly-kickoff": "node -r dotenv/config scripts/trigger-cron.js weekly-kickoff",
+    "cron:midweek": "node -r dotenv/config scripts/trigger-cron.js midweek",
+    "cron:weekend": "node -r dotenv/config scripts/trigger-cron.js weekend",
+    "cron:monthly-todo": "node -r dotenv/config scripts/trigger-cron.js monthly-todo",
+    "tunnel": "cloudflared tunnel --url http://localhost:3000"
   },
   "dependencies": {
     "@line/bot-sdk": "^9.4.2",
     "@upstash/redis": "^1.34.3",
     "dayjs": "^1.11.10",
+    "dotenv": "^16.4.5",
     "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
   }
 }
