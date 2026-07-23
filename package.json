@@ -4,11 +4,29 @@
   "description": "LINE 群組值日生提醒機器人",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node -r dotenv/config index.js",
+    "dev": "nodemon -r dotenv/config index.js",
+    "test:rotation": "node -r dotenv/config scripts/test-rotation.js",
+    "test:db": "node -r dotenv/config scripts/test-db.js",
+    "test:db:prod": "node -r dotenv/config scripts/test-db.js dotenv_config_path=.env.production",
+    "cron:weekly-kickoff": "node -r dotenv/config scripts/trigger-cron.js weekly-kickoff",
+    "cron:midweek": "node -r dotenv/config scripts/trigger-cron.js midweek",
+    "cron:weekend": "node -r dotenv/config scripts/trigger-cron.js weekend",
+    "cron:monthly-todo": "node -r dotenv/config scripts/trigger-cron.js monthly-todo",
+    "cron:weekly-kickoff:prod": "node -r dotenv/config scripts/trigger-cron.js weekly-kickoff dotenv_config_path=.env.production",
+    "cron:midweek:prod": "node -r dotenv/config scripts/trigger-cron.js midweek dotenv_config_path=.env.production",
+    "cron:weekend:prod": "node -r dotenv/config scripts/trigger-cron.js weekend dotenv_config_path=.env.production",
+    "cron:monthly-todo:prod": "node -r dotenv/config scripts/trigger-cron.js monthly-todo dotenv_config_path=.env.production",
+    "tunnel": "cloudflared tunnel --url http://localhost:3000"
   },
   "dependencies": {
     "@line/bot-sdk": "^9.4.2",
+    "@upstash/redis": "^1.34.3",
     "dayjs": "^1.11.10",
+    "dotenv": "^16.4.5",
     "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
   }
 }

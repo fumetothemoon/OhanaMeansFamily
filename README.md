@@ -73,7 +73,22 @@ LINE 現在的流程改成要先建立「LINE 官方帳號」，再從官方帳�
 1. 到 [github.com](https://github.com) 新增一個 **private** repository（例如叫 `OhanaMeansFamily`）
 2. 把這個資料夾的內容 push 上去（GitHub 網頁可以直接拖曳上傳檔案，不用會 git 指令也行）
 
-## 四、部署後端程式（推薦 Render 免費方案即可，因為現在不需要 24 小時常駐了）
+## 四、建立免費的 Upstash Redis（用來存值日狀態跟待辦清單，資料不會因為主機睡覺或重新部署而消失）
+
+之前遇到過「Render 重新部署後，資料被清空、按鈕沒反應」的問題，原因是本地 JSON 檔案在 Render
+免費方案上是暫時性的。現在改用 Upstash Redis（免費額度、透過 REST API 存取）當作資料庫，
+不管主機睡幾次、重新部署幾次，資料都會留著。
+
+1. 到 [upstash.com](https://upstash.com/) 註冊一個免費帳號（可以直接用 GitHub 登入）
+2. 建立一個新的 **Redis** database：
+   - Name：隨意，例如 `OhanaMeansFamily`
+   - Type：選 **Regional**（免費方案即可），Region 選離你們最近的（例如 Tokyo 或 Singapore）
+3. 建立完成後，進入這個 database 的頁面，找到 **REST API** 這個區塊，會看到兩組值：
+   - `UPSTASH_REDIS_REST_URL`
+   - `UPSTASH_REDIS_REST_TOKEN`
+     把這兩組值複製起來，等一下部署 Render 時要用
+
+## 五、部署後端程式（推薦 Render 免費方案即可，因為現在不需要 24 小時常駐了）
 
 1. 到 [render.com](https://render.com) 用 GitHub 登入
 2. New → Web Service → 選你剛剛的 `OhanaMeansFamily` repo
@@ -87,31 +102,35 @@ LINE 現在的流程改成要先建立「LINE 官方帳號」，再從官方帳�
    - `LINE_CHANNEL_SECRET` = 剛剛複製的 secret
    - `LINE_GROUP_ID` = 先留空，下一步會拿到
    - `CRON_SECRET` = 自己隨便打一串英數字亂碼（例如用密碼產生器產生），記下來
+   - `UPSTASH_REDIS_REST_URL` = 上一步複製的值
+   - `UPSTASH_REDIS_REST_TOKEN` = 上一步複製的值
 5. 部署完成後會拿到一個網址，例如 `https://OhanaMeansFamily-xxxx.onrender.com`
 6. 把「網址 + `/webhook`」（例如 `https://OhanaMeansFamily-xxxx.onrender.com/webhook`）填回
    LINE Developers Console 的 **Messaging API → Webhook URL**，並打開「Use webhook」
 
 > 免費方案閒置一段時間會睡著，被叫醒時第一個請求可能要等 30~50 秒，之後就正常，這是免費方案的正常現象。
+> 因為資料現在存在 Upstash，睡醒或重新部署都不會遺失值日進度跟待辦清單。
 
 ### 取得 GROUP_ID
 
 1. 部署好、Webhook 設定好之後，在你們的群組裡隨便發一句話（或輸入 `/groupid`）
 2. 到 Render 的 Logs 裡會看到一行 `目前群組 groupId = Cxxxxxxxx...`，把這串複製起來
 3. 回到 Render 的 Environment，把 `LINE_GROUP_ID` 設成這個值，儲存後它會自動重新部署
+   （因為狀態現在存在 Upstash，重新部署不會影響已經記錄的值日進度）
 
-## 五、設定 GitHub Actions 排程（負責準時觸發提醒，完全免費）
+## 六、設定 GitHub Actions 排程（負責準時觸發提醒，完全免費）
 
 1. 回到你的 GitHub repo → **Settings → Secrets and variables → Actions**
 2. 新增兩個 repository secrets：
    - `APP_URL` = 你的 Render 網址，**不要**加最後的斜線，例如 `https://OhanaMeansFamily-xxxx.onrender.com`
-   - `CRON_SECRET` = 跟第四步驟設的 `CRON_SECRET` 完全一樣的那串亂碼
+   - `CRON_SECRET` = 跟第五步驟設的 `CRON_SECRET` 完全一樣的那串亂碼
 3. 這樣就完成了！`.github/workflows/reminders.yml` 已經寫好排程時間
    （週一/三/日 17:00 台灣時間 + 每月 1 號 09:00 台灣時間）
 4. 想先測試看看的話，到 GitHub repo 的 **Actions** 分頁 → 左邊選 `OhanaMeansFamily reminders`
    → 右邊 **Run workflow** → 選一個要測試的項目（例如 `weekly-kickoff`）→ Run，
    幾秒後群組就應該會收到訊息
 
-## 六、修改成你們家實際的設定
+## 七、修改成你們家實際的設定
 
 打開 `config.js`：
 
@@ -122,7 +141,7 @@ LINE 現在的流程改成要先建立「LINE 官方帳號」，再從官方帳�
 
 改完存檔、重新部署，機器人就會照新設定運作。
 
-## 七、群組裡可以用的指令
+## 八、群組裡可以用的指令
 
 - `/狀態`：查看本週值日進度
 - `/todo` 或 `/待辦`：查看當月待辦清單
@@ -130,12 +149,79 @@ LINE 現在的流程改成要先建立「LINE 官方帳號」，再從官方帳�
 - `/todo 完成 3`：把編號 3 的待辦標記完成
 - `/groupid`：查詢目前群組的 groupId（設定時用）
 
-## 本機測試
+## Local Development & Testing
+
+Install everything first:
 
 ```bash
 npm install
-LINE_CHANNEL_ACCESS_TOKEN=xxx LINE_CHANNEL_SECRET=xxx npm start
 ```
 
-需要用 [ngrok](https://ngrok.com/) 之類的工具把本機的 `/webhook` 暴露到外網，
-才能在 LINE Developers Console 設定 Webhook URL 做測試。
+This adds a few dedicated scripts so you can test each part locally without deploying to Render every time.
+
+### 1. Test the rotation logic only (no network needed at all)
+
+```bash
+npm run test:rotation
+```
+
+Prints the current on-duty group and a 6-week rotation preview. Good for checking `config.js` changes (like `ROTATION_START_MONDAY` or `ROTATION_GROUPS`) instantly.
+
+### 2. Test the Upstash Redis connection
+
+```bash
+UPSTASH_REDIS_REST_URL=xxx UPSTASH_REDIS_REST_TOKEN=xxx npm run test:db
+```
+
+Reads your current stored state, does a round-trip write/read to confirm the connection works, then cleans up after itself — your real data isn't touched.
+
+### 3. Run the server locally with auto-restart on save
+
+```bash
+LINE_CHANNEL_ACCESS_TOKEN=xxx LINE_CHANNEL_SECRET=xxx CRON_SECRET=xxx \
+LINE_GROUP_ID=your-test-group-id \
+UPSTASH_REDIS_REST_URL=xxx UPSTASH_REDIS_REST_TOKEN=xxx \
+npm run dev
+```
+
+Uses `nodemon`, so it restarts automatically whenever you save a file. **Use your test group's ID here, not the real household group's**, to avoid spamming your roommates while you're debugging.
+
+### 4. Trigger a specific reminder manually (no LINE webhook / no tunnel needed)
+
+With the server from step 3 running, open another terminal and run any of:
+
+```bash
+CRON_SECRET=xxx npm run cron:weekly-kickoff
+CRON_SECRET=xxx npm run cron:midweek
+CRON_SECRET=xxx npm run cron:weekend
+CRON_SECRET=xxx npm run cron:monthly-todo
+```
+
+Each one POSTs to the matching `/cron/*` endpoint on your local server, exactly like GitHub Actions would — the message goes straight to your test group. `CRON_SECRET` here must match the one you started the server with in step 3.
+
+### 5. Test buttons/commands (needs a public URL pointing at your local server)
+
+Only required for testing things LINE sends _to_ you — tapping the "完成" button or typing a command in the group. Use a temporary tunnel:
+
+```bash
+# Option A: cloudflared (no account needed, fastest to set up)
+npm run tunnel
+
+# Option B: ngrok (needs a free account)
+ngrok http 3000
+```
+
+Either gives you a temporary public URL like `https://xxxx.trycloudflare.com`. Then:
+
+1. Go to LINE Developers Console → Messaging API → Webhook URL, temporarily set it to `https://xxxx.trycloudflare.com/webhook`
+2. Click Verify to confirm it succeeds
+3. Tap buttons / type commands in your test group and watch your local terminal logs
+4. **Remember to switch the Webhook URL back to your Render URL afterward**, or your production bot will stop receiving events
+
+### Recommended workflow
+
+1. Make your change
+2. `npm run test:rotation` and/or `npm run test:db` for pure logic/data changes
+3. `npm run dev` + `npm run cron:*` to test outbound messages
+4. Only spin up a tunnel (step 5) if you touched button/command handling
+5. Once it all works locally, commit and push — Render will redeploy automatically

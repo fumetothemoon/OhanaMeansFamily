@@ -9,6 +9,7 @@ const {
   getOrCreateWeekState,
   markTaskDone,
   isWeekFullyDone,
+  resetWeek,
 } = require("./lib/rotation");
 const {
   buildDutyFlex,
@@ -67,7 +68,7 @@ async function pushToGroup(messages) {
 // ------------------------------------------------------------
 async function sendWeeklyKickoff() {
   const weekKey = getWeekKey();
-  const week = getOrCreateWeekState(weekKey);
+  const week = await getOrCreateWeekState(weekKey);
   const flex = buildDutyFlex({
     title: "🧹 本週值日提醒",
     weekKey,
@@ -82,7 +83,7 @@ async function sendWeeklyKickoff() {
 
 async function sendMidweekOrWeekendReminder(label) {
   const weekKey = getWeekKey();
-  const week = getOrCreateWeekState(weekKey);
+  const week = await getOrCreateWeekState(weekKey);
   if (isWeekFullyDone(week)) return; // 全部完成就不用再提醒
   const flex = buildDutyFlex({
     title: `⏰ ${label}提醒：還有工作沒完成`,
@@ -95,7 +96,7 @@ async function sendMidweekOrWeekendReminder(label) {
 }
 
 async function sendMonthlyTodoReminder() {
-  const openTodos = listTodos({ onlyOpen: true });
+  const openTodos = await listTodos({ onlyOpen: true });
   if (openTodos.length === 0) return;
   await pushToGroup(buildTodoListMessage(openTodos));
 }
@@ -137,15 +138,20 @@ async function handlePostback(event) {
   const taskId = data.get("task");
   const name = (await getDisplayName(event.source)) || "室友";
 
-  const week = markTaskDone(weekKey, taskId, name);
+  const week = await markTaskDone(weekKey, taskId, name);
   if (!week) return;
 
   const task = week.tasks.find((t) => t.id === Number(taskId));
+  const flex = buildDutyFlex({
+    title: `✅ ${name} 完成了「${task.label}」`,
+    weekKey,
+    groupName: week.groupName,
+    members: week.members,
+    tasks: week.tasks,
+  });
   await client.replyMessage({
     replyToken: event.replyToken,
-    messages: [
-      { type: "text", text: `✅ 已回報完成：${task.label}（${name}）` },
-    ],
+    messages: [flex],
   });
 
   if (isWeekFullyDone(week)) {
@@ -160,13 +166,37 @@ async function handleTextMessage(event) {
   // 查詢本週值日狀態
   if (text === "/狀態" || text === "/status" || text === "/值日") {
     const weekKey = getWeekKey();
-    const week = getOrCreateWeekState(weekKey);
+    const week = await getOrCreateWeekState(weekKey);
     const flex = buildDutyFlex({
       title: "🧹 本週值日狀態",
       weekKey,
       groupName: week.groupName,
       members: week.members,
       tasks: week.tasks,
+    });
+    return client.replyMessage({
+      replyToken: event.replyToken,
+      messages: [flex],
+    });
+  }
+
+  // 重設本週值日勾選（清空所有工作的完成狀態，重新開始）
+  if (text === "/reset" || text === "/重設") {
+    const weekKey = getWeekKey();
+    const week = await resetWeek(weekKey);
+    if (!week) {
+      return client.replyMessage({
+        replyToken: event.replyToken,
+        messages: [{ type: "text", text: "目前沒有本週的值日紀錄可以重設。" }],
+      });
+    }
+    const flex = buildDutyFlex({
+      title: `🔄 ${name} 重設了本週值日`,
+      weekKey,
+      groupName: week.groupName,
+      members: week.members,
+      tasks: week.tasks,
+      footerNote: "所有工作已重新標記為未完成，可以重新開始勾選。",
     });
     return client.replyMessage({
       replyToken: event.replyToken,
@@ -181,7 +211,7 @@ async function handleTextMessage(event) {
     text === "/todo list" ||
     text === "/todo 查詢"
   ) {
-    const todos = listTodos();
+    const todos = await listTodos();
     return client.replyMessage({
       replyToken: event.replyToken,
       messages: [buildTodoListMessage(todos)],
@@ -191,7 +221,7 @@ async function handleTextMessage(event) {
   // 新增待辦： /todo 新增 內容
   const addMatch = text.match(/^\/todo\s+新增\s+(.+)$/);
   if (addMatch) {
-    const todo = addTodo(addMatch[1].trim(), name);
+    const todo = await addTodo(addMatch[1].trim(), name);
     return client.replyMessage({
       replyToken: event.replyToken,
       messages: [
@@ -203,7 +233,7 @@ async function handleTextMessage(event) {
   // 完成待辦： /todo 完成 3
   const doneMatch = text.match(/^\/todo\s+完成\s+(\d+)$/);
   if (doneMatch) {
-    const todo = completeTodo(doneMatch[1], name);
+    const todo = await completeTodo(doneMatch[1], name);
     if (!todo) {
       return client.replyMessage({
         replyToken: event.replyToken,
@@ -248,26 +278,46 @@ function checkCronSecret(req, res) {
 
 app.post("/cron/weekly-kickoff", express.json(), async (req, res) => {
   if (!checkCronSecret(req, res)) return;
-  await sendWeeklyKickoff();
-  res.send("ok");
+  try {
+    await sendWeeklyKickoff();
+    res.send("ok");
+  } catch (e) {
+    console.error("weekly-kickoff failed:", e);
+    res.status(500).send("error");
+  }
 });
 
 app.post("/cron/midweek", express.json(), async (req, res) => {
   if (!checkCronSecret(req, res)) return;
-  await sendMidweekOrWeekendReminder("週間");
-  res.send("ok");
+  try {
+    await sendMidweekOrWeekendReminder("週間");
+    res.send("ok");
+  } catch (e) {
+    console.error("midweek reminder failed:", e);
+    res.status(500).send("error");
+  }
 });
 
 app.post("/cron/weekend", express.json(), async (req, res) => {
   if (!checkCronSecret(req, res)) return;
-  await sendMidweekOrWeekendReminder("週末");
-  res.send("ok");
+  try {
+    await sendMidweekOrWeekendReminder("週末");
+    res.send("ok");
+  } catch (e) {
+    console.error("weekend reminder failed:", e);
+    res.status(500).send("error");
+  }
 });
 
 app.post("/cron/monthly-todo", express.json(), async (req, res) => {
   if (!checkCronSecret(req, res)) return;
-  await sendMonthlyTodoReminder();
-  res.send("ok");
+  try {
+    await sendMonthlyTodoReminder();
+    res.send("ok");
+  } catch (e) {
+    console.error("monthly todo reminder failed:", e);
+    res.status(500).send("error");
+  }
 });
 
 app.get("/", (req, res) => res.send("OhanaMeansFamily is running"));
