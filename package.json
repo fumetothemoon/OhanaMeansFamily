@@ -1,0 +1,14 @@
+{
+  "name": "ohana-means-family",
+  "version": "1.0.0",
+  "description": "LINE 群組值日生提醒機器人",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@line/bot-sdk": "^9.4.2",
+    "dayjs": "^1.11.10",
+    "express": "^4.19.2"
+  }
+}

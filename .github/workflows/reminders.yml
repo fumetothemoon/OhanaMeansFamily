@@ -1,0 +1,53 @@
+name: duty-bot reminders
+
+# 時間都是 UTC，台灣時間 = UTC + 8
+#   週一 17:00 台灣 -> 週一 09:00 UTC
+#   週三 17:00 台灣 -> 週三 09:00 UTC
+#   週日 17:00 台灣 -> 週日 09:00 UTC
+#   每月 1 號 09:00 台灣 -> 每月 1 號 01:00 UTC
+on:
+  schedule:
+    - cron: "0 9 * * 1"   # 週一 17:00 台灣時間：本週任務清單
+    - cron: "0 9 * * 3"   # 週三 17:00 台灣時間：週間提醒
+    - cron: "0 9 * * 0"   # 週日 17:00 台灣時間：週末提醒
+    - cron: "0 1 1 * *"   # 每月 1 號 09:00 台灣時間：待辦清單提醒
+  workflow_dispatch:       # 也可以手動到 GitHub 上按按鈕測試觸發
+    inputs:
+      job:
+        description: "要測試哪一個提醒"
+        required: true
+        default: "weekly-kickoff"
+        type: choice
+        options:
+          - weekly-kickoff
+          - midweek
+          - weekend
+          - monthly-todo
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 判斷這次要打哪一個端點
+        id: decide
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "path=${{ inputs.job }}" >> "$GITHUB_OUTPUT"
+          else
+            cron="${{ github.event.schedule }}"
+            case "$cron" in
+              "0 9 * * 1") echo "path=weekly-kickoff" >> "$GITHUB_OUTPUT" ;;
+              "0 9 * * 3") echo "path=midweek" >> "$GITHUB_OUTPUT" ;;
+              "0 9 * * 0") echo "path=weekend" >> "$GITHUB_OUTPUT" ;;
+              "0 1 1 * *") echo "path=monthly-todo" >> "$GITHUB_OUTPUT" ;;
+            esac
+          fi
+
+      - name: 呼叫機器人觸發端點
+        run: |
+          curl -sS -X POST "${{ secrets.APP_URL }}/cron/${{ steps.decide.outputs.path }}" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            --max-time 90 \
+            --retry 2 \
+            --retry-delay 5 \
+            --fail
