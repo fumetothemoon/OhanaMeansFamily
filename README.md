@@ -1,6 +1,7 @@
 # OhanaMeansFamily 值日生提醒機器人
 
 功能：
+
 - 每週輪值提醒（3組輪流：我 / Jane+范老師 / 詠晴+阿升）
 - 6項值日工作各自獨立勾選回報，全部完成當週就不再提醒
 - 週一 17:00 發本週任務、週三 17:00 / 週日 17:00 提醒尚未完成的項目
@@ -23,6 +24,7 @@ LINE 的訊息（按「完成」按鈕、打指令）平常互動不多，睡著
 **OhanaMeansFamily** is a LINE group chatbot that reminds roommates about their weekly chore duties.
 
 **Features:**
+
 - Weekly chore-duty rotation reminders across 3 groups (Me / Jane+Fan Laoshi / Yongqing+Asheng), rotating automatically every week
 - 6 individual chore tasks, each reported/checked off separately; once all 6 are done for the week, reminders stop for that cycle
 - Automatic reminders sent Monday 17:00 (new week's task list), Wednesday 17:00, and Sunday 17:00 (only for tasks still outstanding)
@@ -68,13 +70,13 @@ LINE 現在的流程改成要先建立「LINE 官方帳號」，再從官方帳�
 
 ## 三、把程式碼放到 GitHub
 
-1. 到 [github.com](https://github.com) 新增一個 **private** repository（例如叫 `duty-bot`）
+1. 到 [github.com](https://github.com) 新增一個 **private** repository（例如叫 `OhanaMeansFamily`）
 2. 把這個資料夾的內容 push 上去（GitHub 網頁可以直接拖曳上傳檔案，不用會 git 指令也行）
 
 ## 四、部署後端程式（推薦 Render 免費方案即可，因為現在不需要 24 小時常駐了）
 
 1. 到 [render.com](https://render.com) 用 GitHub 登入
-2. New → Web Service → 選你剛剛的 `duty-bot` repo
+2. New → Web Service → 選你剛剛的 `OhanaMeansFamily` repo
 3. 設定：
    - Runtime: Node
    - Build Command: `npm install`
@@ -85,13 +87,14 @@ LINE 現在的流程改成要先建立「LINE 官方帳號」，再從官方帳�
    - `LINE_CHANNEL_SECRET` = 剛剛複製的 secret
    - `LINE_GROUP_ID` = 先留空，下一步會拿到
    - `CRON_SECRET` = 自己隨便打一串英數字亂碼（例如用密碼產生器產生），記下來
-5. 部署完成後會拿到一個網址，例如 `https://duty-bot-xxxx.onrender.com`
-6. 把「網址 + `/webhook`」（例如 `https://duty-bot-xxxx.onrender.com/webhook`）填回
+5. 部署完成後會拿到一個網址，例如 `https://OhanaMeansFamily-xxxx.onrender.com`
+6. 把「網址 + `/webhook`」（例如 `https://OhanaMeansFamily-xxxx.onrender.com/webhook`）填回
    LINE Developers Console 的 **Messaging API → Webhook URL**，並打開「Use webhook」
 
 > 免費方案閒置一段時間會睡著，被叫醒時第一個請求可能要等 30~50 秒，之後就正常，這是免費方案的正常現象。
 
 ### 取得 GROUP_ID
+
 1. 部署好、Webhook 設定好之後，在你們的群組裡隨便發一句話（或輸入 `/groupid`）
 2. 到 Render 的 Logs 裡會看到一行 `目前群組 groupId = Cxxxxxxxx...`，把這串複製起來
 3. 回到 Render 的 Environment，把 `LINE_GROUP_ID` 設成這個值，儲存後它會自動重新部署
@@ -100,17 +103,18 @@ LINE 現在的流程改成要先建立「LINE 官方帳號」，再從官方帳�
 
 1. 回到你的 GitHub repo → **Settings → Secrets and variables → Actions**
 2. 新增兩個 repository secrets：
-   - `APP_URL` = 你的 Render 網址，**不要**加最後的斜線，例如 `https://duty-bot-xxxx.onrender.com`
+   - `APP_URL` = 你的 Render 網址，**不要**加最後的斜線，例如 `https://OhanaMeansFamily-xxxx.onrender.com`
    - `CRON_SECRET` = 跟第四步驟設的 `CRON_SECRET` 完全一樣的那串亂碼
 3. 這樣就完成了！`.github/workflows/reminders.yml` 已經寫好排程時間
    （週一/三/日 17:00 台灣時間 + 每月 1 號 09:00 台灣時間）
-4. 想先測試看看的話，到 GitHub repo 的 **Actions** 分頁 → 左邊選 `duty-bot reminders`
+4. 想先測試看看的話，到 GitHub repo 的 **Actions** 分頁 → 左邊選 `OhanaMeansFamily reminders`
    → 右邊 **Run workflow** → 選一個要測試的項目（例如 `weekly-kickoff`）→ Run，
    幾秒後群組就應該會收到訊息
 
 ## 六、修改成你們家實際的設定
 
 打開 `config.js`：
+
 - `ROTATION_GROUPS`：確認 3 組分法跟成員名字正確
 - `ROTATION_START_MONDAY`：填「現在這一週」的週一日期，代表這週算第一組值日
 - `DUTY_TASKS`：六項工作內容（已經照你提供的填好）

@@ -1,4 +1,4 @@
-name: duty-bot reminders
+name: OhanaMeansFamily reminders
 
 # 時間都是 UTC，台灣時間 = UTC + 8
 #   週一 17:00 台灣 -> 週一 09:00 UTC
@@ -7,11 +7,11 @@ name: duty-bot reminders
 #   每月 1 號 09:00 台灣 -> 每月 1 號 01:00 UTC
 on:
   schedule:
-    - cron: "0 9 * * 1"   # 週一 17:00 台灣時間：本週任務清單
-    - cron: "0 9 * * 3"   # 週三 17:00 台灣時間：週間提醒
-    - cron: "0 9 * * 0"   # 週日 17:00 台灣時間：週末提醒
-    - cron: "0 1 1 * *"   # 每月 1 號 09:00 台灣時間：待辦清單提醒
-  workflow_dispatch:       # 也可以手動到 GitHub 上按按鈕測試觸發
+    - cron: "0 9 * * 1" # 週一 17:00 台灣時間：本週任務清單
+    - cron: "0 9 * * 3" # 週三 17:00 台灣時間：週間提醒
+    - cron: "0 9 * * 0" # 週日 17:00 台灣時間：週末提醒
+    - cron: "0 1 1 * *" # 每月 1 號 09:00 台灣時間：待辦清單提醒
+  workflow_dispatch: # 也可以手動到 GitHub 上按按鈕測試觸發
     inputs:
       job:
         description: "要測試哪一個提醒"

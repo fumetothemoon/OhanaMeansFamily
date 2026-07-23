@@ -10,7 +10,11 @@ const {
   markTaskDone,
   isWeekFullyDone,
 } = require("./lib/rotation");
-const { buildDutyFlex, buildAllDoneMessage, buildTodoListMessage } = require("./lib/messages");
+const {
+  buildDutyFlex,
+  buildAllDoneMessage,
+  buildTodoListMessage,
+} = require("./lib/messages");
 const { listTodos, addTodo, completeTodo } = require("./lib/todos");
 
 const lineConfig = {
@@ -29,7 +33,10 @@ const app = express();
 async function getDisplayName(source) {
   try {
     if (source.type === "group" && source.userId) {
-      const profile = await client.getGroupMemberProfile(source.groupId, source.userId);
+      const profile = await client.getGroupMemberProfile(
+        source.groupId,
+        source.userId,
+      );
       return profile.displayName;
     }
     if (source.userId) {
@@ -44,7 +51,9 @@ async function getDisplayName(source) {
 
 async function pushToGroup(messages) {
   if (!config.GROUP_ID) {
-    console.warn("尚未設定 GROUP_ID，訊息無法推播。請看 README 說明如何取得 groupId。");
+    console.warn(
+      "尚未設定 GROUP_ID，訊息無法推播。請看 README 說明如何取得 groupId。",
+    );
     return;
   }
   await client.pushMessage({
@@ -65,7 +74,8 @@ async function sendWeeklyKickoff() {
     groupName: week.groupName,
     members: week.members,
     tasks: week.tasks,
-    footerNote: "完成一項就按一下對應的「完成」按鈕即可，做完全部六項就不會再收到提醒囉。",
+    footerNote:
+      "完成一項就按一下對應的「完成」按鈕即可，做完全部六項就不會再收到提醒囉。",
   });
   await pushToGroup(flex);
 }
@@ -133,7 +143,9 @@ async function handlePostback(event) {
   const task = week.tasks.find((t) => t.id === Number(taskId));
   await client.replyMessage({
     replyToken: event.replyToken,
-    messages: [{ type: "text", text: `✅ 已回報完成：${task.label}（${name}）` }],
+    messages: [
+      { type: "text", text: `✅ 已回報完成：${task.label}（${name}）` },
+    ],
   });
 
   if (isWeekFullyDone(week)) {
@@ -156,11 +168,19 @@ async function handleTextMessage(event) {
       members: week.members,
       tasks: week.tasks,
     });
-    return client.replyMessage({ replyToken: event.replyToken, messages: [flex] });
+    return client.replyMessage({
+      replyToken: event.replyToken,
+      messages: [flex],
+    });
   }
 
   // 查待辦清單
-  if (text === "/todo" || text === "/待辦" || text === "/todo list" || text === "/todo 查詢") {
+  if (
+    text === "/todo" ||
+    text === "/待辦" ||
+    text === "/todo list" ||
+    text === "/todo 查詢"
+  ) {
     const todos = listTodos();
     return client.replyMessage({
       replyToken: event.replyToken,
@@ -174,7 +194,9 @@ async function handleTextMessage(event) {
     const todo = addTodo(addMatch[1].trim(), name);
     return client.replyMessage({
       replyToken: event.replyToken,
-      messages: [{ type: "text", text: `已新增待辦 #${todo.id}：${todo.text}` }],
+      messages: [
+        { type: "text", text: `已新增待辦 #${todo.id}：${todo.text}` },
+      ],
     });
   }
 
@@ -190,7 +212,9 @@ async function handleTextMessage(event) {
     }
     return client.replyMessage({
       replyToken: event.replyToken,
-      messages: [{ type: "text", text: `🎉 待辦 #${todo.id}「${todo.text}」已標記完成` }],
+      messages: [
+        { type: "text", text: `🎉 待辦 #${todo.id}「${todo.text}」已標記完成` },
+      ],
     });
   }
 
@@ -198,7 +222,12 @@ async function handleTextMessage(event) {
   if (text === "/groupid") {
     return client.replyMessage({
       replyToken: event.replyToken,
-      messages: [{ type: "text", text: `groupId = ${event.source.groupId || "(不在群組中)"}` }],
+      messages: [
+        {
+          type: "text",
+          text: `groupId = ${event.source.groupId || "(不在群組中)"}`,
+        },
+      ],
     });
   }
 }
@@ -241,7 +270,9 @@ app.post("/cron/monthly-todo", express.json(), async (req, res) => {
   res.send("ok");
 });
 
-app.get("/", (req, res) => res.send("duty-bot is running"));
+app.get("/", (req, res) => res.send("OhanaMeansFamily is running"));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`duty-bot listening on port ${PORT}`));
+app.listen(PORT, () =>
+  console.log(`OhanaMeansFamily listening on port ${PORT}`),
+);
