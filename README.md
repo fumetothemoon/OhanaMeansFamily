@@ -81,7 +81,7 @@ LINE 現在的流程改成要先建立「LINE 官方帳號」，再從官方帳�
 
 1. 到 [upstash.com](https://upstash.com/) 註冊一個免費帳號（可以直接用 GitHub 登入）
 2. 建立一個新的 **Redis** database：
-   - Name：隨意，例如 `duty-bot`
+   - Name：隨意，例如 `OhanaMeansFamily`
    - Type：選 **Regional**（免費方案即可），Region 選離你們最近的（例如 Tokyo 或 Singapore）
 3. 建立完成後，進入這個 database 的頁面，找到 **REST API** 這個區塊，會看到兩組值：
    - `UPSTASH_REDIS_REST_URL`
@@ -104,8 +104,8 @@ LINE 現在的流程改成要先建立「LINE 官方帳號」，再從官方帳�
    - `CRON_SECRET` = 自己隨便打一串英數字亂碼（例如用密碼產生器產生），記下來
    - `UPSTASH_REDIS_REST_URL` = 上一步複製的值
    - `UPSTASH_REDIS_REST_TOKEN` = 上一步複製的值
-5. 部署完成後會拿到一個網址，例如 `https://duty-bot-xxxx.onrender.com`
-6. 把「網址 + `/webhook`」（例如 `https://duty-bot-xxxx.onrender.com/webhook`）填回
+5. 部署完成後會拿到一個網址，例如 `https://OhanaMeansFamily-xxxx.onrender.com`
+6. 把「網址 + `/webhook`」（例如 `https://OhanaMeansFamily-xxxx.onrender.com/webhook`）填回
    LINE Developers Console 的 **Messaging API → Webhook URL**，並打開「Use webhook」
 
 > 免費方案閒置一段時間會睡著，被叫醒時第一個請求可能要等 30~50 秒，之後就正常，這是免費方案的正常現象。
@@ -122,11 +122,11 @@ LINE 現在的流程改成要先建立「LINE 官方帳號」，再從官方帳�
 
 1. 回到你的 GitHub repo → **Settings → Secrets and variables → Actions**
 2. 新增兩個 repository secrets：
-   - `APP_URL` = 你的 Render 網址，**不要**加最後的斜線，例如 `https://duty-bot-xxxx.onrender.com`
+   - `APP_URL` = 你的 Render 網址，**不要**加最後的斜線，例如 `https://OhanaMeansFamily-xxxx.onrender.com`
    - `CRON_SECRET` = 跟第五步驟設的 `CRON_SECRET` 完全一樣的那串亂碼
 3. 這樣就完成了！`.github/workflows/reminders.yml` 已經寫好排程時間
    （週一/三/日 17:00 台灣時間 + 每月 1 號 09:00 台灣時間）
-4. 想先測試看看的話，到 GitHub repo 的 **Actions** 分頁 → 左邊選 `duty-bot reminders`
+4. 想先測試看看的話，到 GitHub repo 的 **Actions** 分頁 → 左邊選 `OhanaMeansFamily reminders`
    → 右邊 **Run workflow** → 選一個要測試的項目（例如 `weekly-kickoff`）→ Run，
    幾秒後群組就應該會收到訊息
 

@@ -270,7 +270,9 @@ app.post("/cron/monthly-todo", express.json(), async (req, res) => {
   res.send("ok");
 });
 
-app.get("/", (req, res) => res.send("duty-bot is running"));
+app.get("/", (req, res) => res.send("OhanaMeansFamily is running"));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`duty-bot listening on port ${PORT}`));
+app.listen(PORT, () =>
+  console.log(`OhanaMeansFamily listening on port ${PORT}`),
+);
