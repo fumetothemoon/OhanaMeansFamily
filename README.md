@@ -73,7 +73,22 @@ LINE 現在的流程改成要先建立「LINE 官方帳號」，再從官方帳�
 1. 到 [github.com](https://github.com) 新增一個 **private** repository（例如叫 `OhanaMeansFamily`）
 2. 把這個資料夾的內容 push 上去（GitHub 網頁可以直接拖曳上傳檔案，不用會 git 指令也行）
 
-## 四、部署後端程式（推薦 Render 免費方案即可，因為現在不需要 24 小時常駐了）
+## 四、建立免費的 Upstash Redis（用來存值日狀態跟待辦清單，資料不會因為主機睡覺或重新部署而消失）
+
+之前遇到過「Render 重新部署後，資料被清空、按鈕沒反應」的問題，原因是本地 JSON 檔案在 Render
+免費方案上是暫時性的。現在改用 Upstash Redis（免費額度、透過 REST API 存取）當作資料庫，
+不管主機睡幾次、重新部署幾次，資料都會留著。
+
+1. 到 [upstash.com](https://upstash.com/) 註冊一個免費帳號（可以直接用 GitHub 登入）
+2. 建立一個新的 **Redis** database：
+   - Name：隨意，例如 `duty-bot`
+   - Type：選 **Regional**（免費方案即可），Region 選離你們最近的（例如 Tokyo 或 Singapore）
+3. 建立完成後，進入這個 database 的頁面，找到 **REST API** 這個區塊，會看到兩組值：
+   - `UPSTASH_REDIS_REST_URL`
+   - `UPSTASH_REDIS_REST_TOKEN`
+     把這兩組值複製起來，等一下部署 Render 時要用
+
+## 五、部署後端程式（推薦 Render 免費方案即可，因為現在不需要 24 小時常駐了）
 
 1. 到 [render.com](https://render.com) 用 GitHub 登入
 2. New → Web Service → 選你剛剛的 `OhanaMeansFamily` repo
@@ -87,31 +102,35 @@ LINE 現在的流程改成要先建立「LINE 官方帳號」，再從官方帳�
    - `LINE_CHANNEL_SECRET` = 剛剛複製的 secret
    - `LINE_GROUP_ID` = 先留空，下一步會拿到
    - `CRON_SECRET` = 自己隨便打一串英數字亂碼（例如用密碼產生器產生），記下來
-5. 部署完成後會拿到一個網址，例如 `https://OhanaMeansFamily-xxxx.onrender.com`
-6. 把「網址 + `/webhook`」（例如 `https://OhanaMeansFamily-xxxx.onrender.com/webhook`）填回
+   - `UPSTASH_REDIS_REST_URL` = 上一步複製的值
+   - `UPSTASH_REDIS_REST_TOKEN` = 上一步複製的值
+5. 部署完成後會拿到一個網址，例如 `https://duty-bot-xxxx.onrender.com`
+6. 把「網址 + `/webhook`」（例如 `https://duty-bot-xxxx.onrender.com/webhook`）填回
    LINE Developers Console 的 **Messaging API → Webhook URL**，並打開「Use webhook」
 
 > 免費方案閒置一段時間會睡著，被叫醒時第一個請求可能要等 30~50 秒，之後就正常，這是免費方案的正常現象。
+> 因為資料現在存在 Upstash，睡醒或重新部署都不會遺失值日進度跟待辦清單。
 
 ### 取得 GROUP_ID
 
 1. 部署好、Webhook 設定好之後，在你們的群組裡隨便發一句話（或輸入 `/groupid`）
 2. 到 Render 的 Logs 裡會看到一行 `目前群組 groupId = Cxxxxxxxx...`，把這串複製起來
 3. 回到 Render 的 Environment，把 `LINE_GROUP_ID` 設成這個值，儲存後它會自動重新部署
+   （因為狀態現在存在 Upstash，重新部署不會影響已經記錄的值日進度）
 
-## 五、設定 GitHub Actions 排程（負責準時觸發提醒，完全免費）
+## 六、設定 GitHub Actions 排程（負責準時觸發提醒，完全免費）
 
 1. 回到你的 GitHub repo → **Settings → Secrets and variables → Actions**
 2. 新增兩個 repository secrets：
-   - `APP_URL` = 你的 Render 網址，**不要**加最後的斜線，例如 `https://OhanaMeansFamily-xxxx.onrender.com`
-   - `CRON_SECRET` = 跟第四步驟設的 `CRON_SECRET` 完全一樣的那串亂碼
+   - `APP_URL` = 你的 Render 網址，**不要**加最後的斜線，例如 `https://duty-bot-xxxx.onrender.com`
+   - `CRON_SECRET` = 跟第五步驟設的 `CRON_SECRET` 完全一樣的那串亂碼
 3. 這樣就完成了！`.github/workflows/reminders.yml` 已經寫好排程時間
    （週一/三/日 17:00 台灣時間 + 每月 1 號 09:00 台灣時間）
-4. 想先測試看看的話，到 GitHub repo 的 **Actions** 分頁 → 左邊選 `OhanaMeansFamily reminders`
+4. 想先測試看看的話，到 GitHub repo 的 **Actions** 分頁 → 左邊選 `duty-bot reminders`
    → 右邊 **Run workflow** → 選一個要測試的項目（例如 `weekly-kickoff`）→ Run，
    幾秒後群組就應該會收到訊息
 
-## 六、修改成你們家實際的設定
+## 七、修改成你們家實際的設定
 
 打開 `config.js`：
 
@@ -122,7 +141,7 @@ LINE 現在的流程改成要先建立「LINE 官方帳號」，再從官方帳�
 
 改完存檔、重新部署，機器人就會照新設定運作。
 
-## 七、群組裡可以用的指令
+## 八、群組裡可以用的指令
 
 - `/狀態`：查看本週值日進度
 - `/todo` 或 `/待辦`：查看當月待辦清單
@@ -134,7 +153,8 @@ LINE 現在的流程改成要先建立「LINE 官方帳號」，再從官方帳�
 
 ```bash
 npm install
-LINE_CHANNEL_ACCESS_TOKEN=xxx LINE_CHANNEL_SECRET=xxx npm start
+LINE_CHANNEL_ACCESS_TOKEN=xxx LINE_CHANNEL_SECRET=xxx CRON_SECRET=xxx \
+UPSTASH_REDIS_REST_URL=xxx UPSTASH_REDIS_REST_TOKEN=xxx npm start
 ```
 
 需要用 [ngrok](https://ngrok.com/) 之類的工具把本機的 `/webhook` 暴露到外網，

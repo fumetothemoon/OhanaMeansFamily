@@ -19,6 +19,13 @@ module.exports = {
   // 要跟 GitHub Actions 那邊設定的 secret 一模一樣。
   CRON_SECRET: process.env.CRON_SECRET,
 
+  // Upstash Redis（免費的雲端 key-value 資料庫），用來存值日狀態跟待辦清單。
+  // 不管主機睡幾次、重新部署幾次都不會遺失資料。
+  // 到 https://console.upstash.com/ 建立一個免費 Redis database 後，
+  // 在該 database 的 "REST API" 分頁可以看到這兩組值。
+  UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
+  UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
+
   // ------------------------------------------------------------
   // 輪值分組：每週輪一組，照順序輪替，輪完自動回到第一組
   // ------------------------------------------------------------
