@@ -129,15 +129,6 @@ async function handleEvent(event) {
 }
 
 async function handlePostback(event) {
-  // TEMPORARY DEBUG: set DEBUG_SIMULATE_DELAY_MS in .env to simulate slow processing
-  // const debugDelay = Number(process.env.DEBUG_SIMULATE_DELAY_MS || 0);
-  // if (debugDelay > 0) {
-  //   console.log(
-  //     `[DEBUG] Simulating a ${debugDelay}ms delay before processing...`,
-  //   );
-  //   await new Promise((resolve) => setTimeout(resolve, debugDelay));
-  // }
-
   const data = new URLSearchParams(event.postback.data);
   const action = data.get("action");
   if (action !== "done") return;
