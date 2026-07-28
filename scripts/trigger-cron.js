@@ -1,7 +1,11 @@
 // Cross-platform helper (works on macOS/Linux/Windows) to POST to a /cron/* endpoint.
+// 跨平台輔助工具（適用於 macOS/Linux/Windows），用來向 /cron/* 端點發送 POST 請求。
 // By default targets your local server (http://localhost:PORT).
+// 預設會呼叫本機伺服器（http://localhost:PORT）。
 // If APP_URL is set (e.g. via .env.production), it targets that instead — used by the npm run *:prod scripts to hit Render directly.
+// 若設定 APP_URL（例如透過 .env.production），則會改為呼叫該網址，供 npm run *:prod 指令直接呼叫 Render。
 // Called via the npm scripts: npm run cron:weekly-kickoff / cron:midweek / cron:weekend / cron:monthly-todo (and their :prod variants)
+// 透過 npm 指令執行：npm run cron:weekly-kickoff / cron:midweek / cron:weekend / cron:monthly-todo（以及各自的 :prod 版本）。
 
 const endpoint = process.argv[2];
 if (!endpoint) {
