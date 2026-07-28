@@ -3,12 +3,18 @@
 
 const {
   getWeekKey,
+  getGroupForWeek,
   getOrCreateWeekState,
   resetWeek,
+  syncWeekGroup,
 } = require("../lib/rotation");
 const { buildDutyFlex, buildTodoListMessage } = require("../lib/messages");
 const { listTodos, addTodo, completeTodo } = require("../lib/todos");
 const { client, getDisplayName } = require("../lib/lineClient");
+
+function formatGroup(group) {
+  return `${group.groupName || group.name}（${group.members.join("、")}）`;
+}
 
 async function handleTextMessage(event) {
   const text = event.message.text.trim();
@@ -28,6 +34,46 @@ async function handleTextMessage(event) {
     return client.replyMessage({
       replyToken: event.replyToken,
       messages: [flex],
+    });
+  }
+
+  // Compare this deployment's configured rotation with the saved group for this week.
+  // 比對目前部署的輪值設定與本週已儲存的值日組別。
+  if (text === "/turn-check" || text === "/輪值檢查") {
+    const weekKey = getWeekKey();
+    const expectedGroup = getGroupForWeek(weekKey);
+    const savedWeek = await getOrCreateWeekState(weekKey);
+    const matches =
+      savedWeek.groupIndex === expectedGroup.index &&
+      savedWeek.groupName === expectedGroup.name &&
+      JSON.stringify(savedWeek.members) === JSON.stringify(expectedGroup.members);
+    const result = matches
+      ? "✅ 目前儲存的值日組別與此部署的設定一致。"
+      : "⚠️ 不一致：提醒訊息仍會使用已儲存的組別。確認後輸入 /turn-sync 即可同步，且不會清除完成紀錄。";
+    return client.replyMessage({
+      replyToken: event.replyToken,
+      messages: [
+        {
+          type: "text",
+          text: `🔎 輪值檢查\n週別：${weekKey}\n設定預期：${formatGroup(expectedGroup)}\n目前儲存：${formatGroup(savedWeek)}\n${result}`,
+        },
+      ],
+    });
+  }
+
+  // Update this week's saved group to match the configured rotation.
+  // 將本週已儲存的組別更新為目前輪值設定。
+  if (text === "/turn-sync" || text === "/輪值同步") {
+    const weekKey = getWeekKey();
+    const week = await syncWeekGroup(weekKey);
+    return client.replyMessage({
+      replyToken: event.replyToken,
+      messages: [
+        {
+          type: "text",
+          text: `✅ 已同步 ${weekKey} 的值日組別：${formatGroup(week)}\n既有完成紀錄已保留。`,
+        },
+      ],
     });
   }
 
