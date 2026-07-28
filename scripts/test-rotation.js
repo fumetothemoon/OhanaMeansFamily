@@ -12,11 +12,7 @@ const todayKey = getWeekKey();
 console.log(`Current week key: ${todayKey}`);
 console.log(`Current on-duty group:`, getGroupForWeek(todayKey));
 
-const expectedGroups = [
-  ["Jane", "范"],
-  ["傅"],
-  ["Jean", "升"],
-];
+const expectedGroups = [["Jane", "范"], ["傅"], ["Jean", "升"]];
 
 expectedGroups.forEach((members, index) => {
   const weekKey = dayjs(config.ROTATION_START_MONDAY)

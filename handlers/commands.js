@@ -46,7 +46,8 @@ async function handleTextMessage(event) {
     const matches =
       savedWeek.groupIndex === expectedGroup.index &&
       savedWeek.groupName === expectedGroup.name &&
-      JSON.stringify(savedWeek.members) === JSON.stringify(expectedGroup.members);
+      JSON.stringify(savedWeek.members) ===
+        JSON.stringify(expectedGroup.members);
     const result = matches
       ? "✅ 目前儲存的值日組別與此部署的設定一致。"
       : "⚠️ 不一致：提醒訊息仍會使用已儲存的組別。確認後輸入 /turn-sync 即可同步，且不會清除完成紀錄。";
