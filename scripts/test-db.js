@@ -1,5 +1,7 @@
 // Verifies Upstash Redis read/write works before you rely on it elsewhere.
+// 驗證 Upstash Redis 的讀寫是否正常，再將它用於其他功能。
 // Run with: UPSTASH_REDIS_REST_URL=xxx UPSTASH_REDIS_REST_TOKEN=xxx npm run test:db
+// 執行方式：UPSTASH_REDIS_REST_URL=xxx UPSTASH_REDIS_REST_TOKEN=xxx npm run test:db
 
 const { readDb, writeDb } = require("../lib/db");
 

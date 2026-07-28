@@ -1,5 +1,7 @@
 // Quick sanity check for the rotation logic — no network calls, no LINE, no Upstash needed.
+// 快速檢查輪值邏輯，無需網路呼叫、LINE 或 Upstash。
 // Run with: npm run test:rotation
+// 執行方式：npm run test:rotation
 
 const dayjs = require("dayjs");
 const { getWeekKey, getGroupForWeek } = require("../lib/rotation");
