@@ -1,0 +1,49 @@
+name: Claude Code Review
+
+# Scope: same-repo pull requests, and @claude mentions in PR comments from
+# OWNER/MEMBER/COLLABORATOR associations only.
+# 適用範圍：僅限同一 repo 的 pull request，以及來自 OWNER/MEMBER/COLLABORATOR
+# 身份、留言於 PR 上的 @claude 提及。
+#
+# Fork PRs are excluded: GitHub does not expose repository secrets to
+# fork-originated pull_request events. pull_request_target is not used as a
+# workaround, since it would expose secrets to untrusted fork code.
+# 排除 fork 來源的 PR：GitHub 不會將 repository secrets 提供給來自 fork 的
+# pull_request 事件。不使用 pull_request_target 來規避此限制，
+# 因為那會讓 secrets 暴露給不受信任的 fork 程式碼。
+on:
+  pull_request:
+    types: [opened, synchronize]
+  issue_comment:
+    types: [created]
+
+jobs:
+  review:
+    if: |
+      (
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      ) ||
+      (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request != null &&
+        contains(github.event.comment.body, '@claude') &&
+        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review this pull request. Focus on: logic errors, missed edge cases,
+            security issues, and consistency with the existing codebase's style
+            and patterns. Leave inline comments on specific lines where relevant,
+            and a short summary comment overall.
+          claude_args: "--max-turns 8"
