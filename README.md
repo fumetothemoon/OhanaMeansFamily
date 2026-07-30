@@ -2,7 +2,7 @@
 
 OhanaMeansFamily is a perfect LINE chatbot for your family/roommate group chat, if you don't want to fight over house chores.
 
-OhanaMeansFamily 是給家庭或室友群組使用的完美LINE 機器人，如果你們不想為了做家事而吵架的話。
+OhanaMeansFamily 是給家庭或室友群組使用的完美 LINE 機器人，如果你們不想為了做家事而吵架的話。
 
 ## Features / 功能
 
@@ -108,10 +108,12 @@ npm run cron:monthly-todo
 
 ## Group Commands / 群組指令
 
-| Command               | Description                                         | 說明                                 |
-| --------------------- | --------------------------------------------------- | ------------------------------------ |
-| `/狀態`               | Show this week's chore progress.                    | 查看本週值日進度。                   |
-| `/todo` or `/待辦`    | Show the monthly to-do list.                        | 查看當月待辦清單。                   |
-| `/todo 新增 <text>`   | Add a shared to-do item.                            | 新增共用待辦事項。                   |
-| `/todo 完成 <number>` | Mark a numbered to-do item complete.                | 將指定編號的待辦標記完成。           |
-| `/groupid`            | Print the current LINE group ID in the server logs. | 在伺服器 log 顯示目前 LINE 群組 ID。 |
+| Command                      | Description                                                                                     | 說明                                             |
+| ---------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `/狀態`                      | Show this week's chore progress.                                                                | 查看本週值日進度。                               |
+| `/todo` or `/待辦`           | Show the monthly to-do list.                                                                    | 查看當月待辦清單。                               |
+| `/todo 新增 <text>`          | Add a shared to-do item.                                                                        | 新增共用待辦事項。                               |
+| `/todo 完成 <number>`        | Mark a numbered to-do item complete.                                                            | 將指定編號的待辦標記完成。                       |
+| `/groupid`                   | Print the current LINE group ID in the server logs.                                             | 在伺服器 log 顯示目前 LINE 群組 ID。             |
+| `/turn-check` or `/輪值檢查` | Compare the deployed rotation configuration with this week's stored group.                      | 比對目前部署的輪值設定與本週已儲存的組別。       |
+| `/turn-sync` or `/輪值同步`  | Sync this week's stored group to the current configuration while preserving completion records. | 將本週已儲存的組別同步為目前設定，保留完成紀錄。 |
