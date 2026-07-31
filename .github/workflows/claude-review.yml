@@ -48,3 +48,4 @@ jobs:
             and patterns. Leave inline comments on specific lines where relevant,
             and a short summary comment overall.
           claude_args: "--max-turns 8"
+          show_full_output: true
