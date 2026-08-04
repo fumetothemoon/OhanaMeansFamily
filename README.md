@@ -1,229 +1,123 @@
-# OhanaMeansFamily 值日生提醒機器人
+# OhanaMeansFamily
 
-功能：
+OhanaMeansFamily is a perfect LINE chatbot for your family/roommate group chat, if you don't want to fight over house chores.
 
-- 每週輪值提醒（3組輪流：我 / Jane+范老師 / 詠晴+阿升）
-- 6項值日工作各自獨立勾選回報，全部完成當週就不再提醒
-- 週一 17:00 發本週任務、週三 17:00 / 週日 17:00 提醒尚未完成的項目
-- 全體共用的「當月待辦清單」（跟房東的事、要一起買的東西等），任何人都能新增/標記完成
-- 每月 1 號提醒還沒完成的待辦事項
+OhanaMeansFamily 是給家庭或室友群組使用的完美 LINE 機器人，如果你們不想為了做家事而吵架的話。
 
-**架構（零成本版）**：排程改由 **GitHub Actions**（完全免費）在固定時間打你機器人的網址觸發提醒，
-所以主機本身不需要 24 小時不睡覺，可以直接用會自動休眠的免費方案（例如 Render 免費方案）。
-被打到的時候如果剛好在睡，它會自動醒來處理，之後幾秒內就正常回應。
-LINE 的訊息（按「完成」按鈕、打指令）平常互動不多，睡著時第一次會晚個幾十秒回應，之後就正常，
-對值日提醒這種用途完全夠用。
+## Features / 功能
 
-唯一要注意：GitHub Actions 的排程時間偶爾會有數分鐘的延遲（官方排程機制本來就這樣，免費也沒辦法要求準點），
-不是每次都精準卡在 17:00:00，但落在 17:00~17:10 左右很正常，不影響使用。
+- Rotates weekly chores among configured household groups.
+- 依照設定的室友分組自動輪替每週值日。
+- Tracks six chores independently and stops reminders after all chores are complete.
+- 六項值日工作可分別回報；全部完成後，該週不再發送提醒。
+- Sends a weekly task list on Monday, outstanding-task reminders on Wednesday and Sunday, and an open-to-do reminder on the first day of each month.
+- 每週一發送本週任務，週三與週日提醒未完成工作，每月 1 日提醒尚未完成的待辦事項。
+- Lets everyone view, add, and complete shared monthly to-do items in the group.
+- 任何群組成員都能查看、新增與完成共用的每月待辦事項。
 
----
+Scheduling is performed by GitHub Actions, while task and to-do state is stored in Upstash Redis. The bot can therefore run on a service that sleeps while idle, such as Render's free plan.
 
-## English Description
+排程由 GitHub Actions 執行，值日與待辦狀態儲存在 Upstash Redis。因此機器人可部署在閒置時會休眠的服務，例如 Render 免費方案。
 
-**OhanaMeansFamily** is a LINE group chatbot that reminds roommates about their weekly chore duties.
+## Before You Start / 開始前準備
 
-**Features:**
+Create and configure a LINE Official Account and Messaging API channel before running the bot locally or deploying it.
 
-- Weekly chore-duty rotation reminders across 3 groups (Me / Jane+Fan Laoshi / Yongqing+Asheng), rotating automatically every week
-- 6 individual chore tasks, each reported/checked off separately; once all 6 are done for the week, reminders stop for that cycle
-- Automatic reminders sent Monday 17:00 (new week's task list), Wednesday 17:00, and Sunday 17:00 (only for tasks still outstanding)
-- A shared monthly to-do list for the whole household (e.g. things to discuss with the landlord, shared purchases like appliances/furniture) — anyone can add items, list them, or mark them done
-- Monthly reminder (1st of the month) for any still-open to-do items
+在本機執行或部署機器人之前，請先建立並設定 LINE 官方帳號與 Messaging API channel。
 
-**Architecture (zero-cost setup):** Scheduling is handled by **GitHub Actions** (free), which calls dedicated `/cron/*` endpoints on the bot's server at the scheduled times. This means the server itself doesn't need to run 24/7 — it can sit on a free tier that sleeps when idle (e.g. Render's free plan). When a scheduled job or a LINE webhook event hits a sleeping server, it wakes up automatically within tens of seconds, which is perfectly fine for this kind of low-traffic household use case.
+See [LINE setup](docs/LINE_SETUP.md) for the account, channel, token, and group-invitation steps.
 
-One caveat: GitHub Actions' free scheduler can have a delay of a few minutes, so reminders may land a bit after the exact time (e.g. 17:00–17:10) rather than to the second — this doesn't affect usability.
+請參閱 [LINE 設定指南](docs/LINE_SETUP.md)，完成帳號、channel、token 與邀請機器人進群組的步驟。
 
-See `README.md`'s Chinese sections below for full, step-by-step setup instructions (LINE Official Account creation, Messaging API activation, Render deployment, GitHub Actions configuration, and in-chat bot commands). The setup steps are written in Traditional Chinese since that's the language the household group chat uses, but all code, config, and comments in the source files are written to be readable regardless of language — configuration only requires editing plain values in `config.js` (names, tasks, dates, times).
+See [deployment](docs/DEPLOYMENT.md) for Upstash Redis, Render, and GitHub Actions configuration.
 
----
+請參閱 [部署指南](docs/DEPLOYMENT.md)，完成 Upstash Redis、Render 與 GitHub Actions 的設定。
 
-## 一、申請 LINE 官方帳號 + 啟用 Messaging API（約 10 分鐘）
+## Configuration / 設定
 
-LINE 現在的流程改成要先建立「LINE 官方帳號」，再從官方帳號後台啟用 Messaging API，
-不能像以前一樣直接在 Developers Console 建立。步驟如下：
+Edit `config.js` to set the household rotation groups, the Monday that starts the rotation, and the chore list. Keep credentials in environment variables rather than in source code.
 
-1. 前往 [LINE 官方帳號開通頁面](https://www.linebiz.com/tw/entry/) 或直接到
-   [LINE Official Account Manager](https://manager.line.biz/)，用你的 LINE 帳號登入
-2. 按「建立帳號 / Create a LINE Official Account」，填基本資料：
-   - 帳號名稱：例如「值日生小幫手」（隨便取，不影響功能）
-   - 國家、產業類別：隨便選一個接近的即可（例如「其他」）
-   - 需要用手機做一次簡訊驗證
-3. 建立完成後，登入 **LINE Official Account Manager**（[manager.line.biz](https://manager.line.biz/)），
-   選到剛剛建立的帳號
-4. 右上角「設定 / Settings」→ 左側選單找「Messaging API」→ 按「啟用 Messaging API / Enable Messaging API」
-   - 會要你選一個 **Provider**（第一次用的話會叫你新建一個，名稱隨意，例如「我們家」）
-   - 同意條款後即完成啟用
-5. 啟用後，回到 [LINE Developers Console](https://developers.line.biz/console/)（用同一組帳號登入），
-   會看到剛剛那個 Provider 底下已經多了一個 **Messaging API channel**，點進去：
-   - 到 **Messaging API** 分頁，找到 **Channel access token**，按「Issue」產生一組長期 token，複製起來（等等會用到）
-   - 到 **Basic settings** 分頁，複製 **Channel secret**（等等會用到）
-6. 回到 LINE Official Account Manager 的「設定 → 回應設定」，把「自動回應訊息」「加入好友歡迎訊息」都關掉，
-   避免干擾你的機器人訊息
+請編輯 `config.js` 設定室友輪值分組、輪值起算週一與工作項目。憑證請使用環境變數，不要寫入原始碼。
 
-## 二、把機器人加進你們的 LINE 群組
+The application requires `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_CHANNEL_SECRET`, `LINE_GROUP_ID`, `CRON_SECRET`, `UPSTASH_REDIS_REST_URL`, and `UPSTASH_REDIS_REST_TOKEN`.
 
-1. 在 Messaging API 分頁可以看到這個官方帳號的 QR code / 加好友連結
-2. 先用自己的 LINE 加這個官方帳號好友
-3. 打開你們五人的群組 → 設定 → 邀請 → 把這個官方帳號邀請進群組
+程式需要 `LINE_CHANNEL_ACCESS_TOKEN`、`LINE_CHANNEL_SECRET`、`LINE_GROUP_ID`、`CRON_SECRET`、`UPSTASH_REDIS_REST_URL` 與 `UPSTASH_REDIS_REST_TOKEN`。
 
-## 三、把程式碼放到 GitHub
+## Local Development / 本機開發
 
-1. 到 [github.com](https://github.com) 新增一個 **private** repository（例如叫 `OhanaMeansFamily`）
-2. 把這個資料夾的內容 push 上去（GitHub 網頁可以直接拖曳上傳檔案，不用會 git 指令也行）
+Install dependencies with:
 
-## 四、建立免費的 Upstash Redis（用來存值日狀態跟待辦清單，資料不會因為主機睡覺或重新部署而消失）
-
-之前遇到過「Render 重新部署後，資料被清空、按鈕沒反應」的問題，原因是本地 JSON 檔案在 Render
-免費方案上是暫時性的。現在改用 Upstash Redis（免費額度、透過 REST API 存取）當作資料庫，
-不管主機睡幾次、重新部署幾次，資料都會留著。
-
-1. 到 [upstash.com](https://upstash.com/) 註冊一個免費帳號（可以直接用 GitHub 登入）
-2. 建立一個新的 **Redis** database：
-   - Name：隨意，例如 `OhanaMeansFamily`
-   - Type：選 **Regional**（免費方案即可），Region 選離你們最近的（例如 Tokyo 或 Singapore）
-3. 建立完成後，進入這個 database 的頁面，找到 **REST API** 這個區塊，會看到兩組值：
-   - `UPSTASH_REDIS_REST_URL`
-   - `UPSTASH_REDIS_REST_TOKEN`
-     把這兩組值複製起來，等一下部署 Render 時要用
-
-## 五、部署後端程式（推薦 Render 免費方案即可，因為現在不需要 24 小時常駐了）
-
-1. 到 [render.com](https://render.com) 用 GitHub 登入
-2. New → Web Service → 選你剛剛的 `OhanaMeansFamily` repo
-3. 設定：
-   - Runtime: Node
-   - Build Command: `npm install`
-   - Start Command: `npm start`
-   - Instance Type: Free
-4. 到 Environment 分頁，新增以下環境變數：
-   - `LINE_CHANNEL_ACCESS_TOKEN` = 剛剛複製的 token
-   - `LINE_CHANNEL_SECRET` = 剛剛複製的 secret
-   - `LINE_GROUP_ID` = 先留空，下一步會拿到
-   - `CRON_SECRET` = 自己隨便打一串英數字亂碼（例如用密碼產生器產生），記下來
-   - `UPSTASH_REDIS_REST_URL` = 上一步複製的值
-   - `UPSTASH_REDIS_REST_TOKEN` = 上一步複製的值
-5. 部署完成後會拿到一個網址，例如 `https://OhanaMeansFamily-xxxx.onrender.com`
-6. 把「網址 + `/webhook`」（例如 `https://OhanaMeansFamily-xxxx.onrender.com/webhook`）填回
-   LINE Developers Console 的 **Messaging API → Webhook URL**，並打開「Use webhook」
-
-> 免費方案閒置一段時間會睡著，被叫醒時第一個請求可能要等 30~50 秒，之後就正常，這是免費方案的正常現象。
-> 因為資料現在存在 Upstash，睡醒或重新部署都不會遺失值日進度跟待辦清單。
-
-### 取得 GROUP_ID
-
-1. 部署好、Webhook 設定好之後，在你們的群組裡隨便發一句話（或輸入 `/groupid`）
-2. 到 Render 的 Logs 裡會看到一行 `目前群組 groupId = Cxxxxxxxx...`，把這串複製起來
-3. 回到 Render 的 Environment，把 `LINE_GROUP_ID` 設成這個值，儲存後它會自動重新部署
-   （因為狀態現在存在 Upstash，重新部署不會影響已經記錄的值日進度）
-
-## 六、設定 GitHub Actions 排程（負責準時觸發提醒，完全免費）
-
-1. 回到你的 GitHub repo → **Settings → Secrets and variables → Actions**
-2. 新增兩個 repository secrets：
-   - `APP_URL` = 你的 Render 網址，**不要**加最後的斜線，例如 `https://OhanaMeansFamily-xxxx.onrender.com`
-   - `CRON_SECRET` = 跟第五步驟設的 `CRON_SECRET` 完全一樣的那串亂碼
-3. 這樣就完成了！`.github/workflows/reminders.yml` 已經寫好排程時間
-   （週一/三/日 17:00 台灣時間 + 每月 1 號 09:00 台灣時間）
-4. 想先測試看看的話，到 GitHub repo 的 **Actions** 分頁 → 左邊選 `OhanaMeansFamily reminders`
-   → 右邊 **Run workflow** → 選一個要測試的項目（例如 `weekly-kickoff`）→ Run，
-   幾秒後群組就應該會收到訊息
-
-## 七、修改成你們家實際的設定
-
-打開 `config.js`：
-
-- `ROTATION_GROUPS`：確認 3 組分法跟成員名字正確
-- `ROTATION_START_MONDAY`：填「現在這一週」的週一日期，代表這週算第一組值日
-- `DUTY_TASKS`：六項工作內容（已經照你提供的填好）
-- `SCHEDULE`：提醒時間，預設週一/三/日 17:00
-
-改完存檔、重新部署，機器人就會照新設定運作。
-
-## 八、群組裡可以用的指令
-
-- `/狀態`：查看本週值日進度
-- `/todo` 或 `/待辦`：查看當月待辦清單
-- `/todo 新增 內容`：新增一項待辦，例如 `/todo 新增 跟房東反應廚房水管漏水`
-- `/todo 完成 3`：把編號 3 的待辦標記完成
-- `/groupid`：查詢目前群組的 groupId（設定時用）
-- `/turn-check` 或 `/輪值檢查`：比對目前部署的輪值設定與本週已儲存的組別
-- `/turn-sync` 或 `/輪值同步`：將本週已儲存的組別同步為目前設定，保留完成紀錄
-
-## Local Development & Testing
-
-Install everything first:
+請先安裝相依套件：
 
 ```bash
 npm install
 ```
 
-This adds a few dedicated scripts so you can test each part locally without deploying to Render every time.
+Create a local `.env` file with the required environment variables and use a test LINE group ID. Do not use the household production group while developing.
 
-### 1. Test the rotation logic only (no network needed at all)
+建立包含必要環境變數的本機 `.env` 檔案，並使用測試 LINE 群組 ID。開發時請勿使用正式的室友群組。
+
+Start the server with automatic reloads:
+
+使用自動重新載入模式啟動伺服器：
+
+```bash
+npm run dev
+```
+
+The server listens on port `3000` by default. To receive LINE webhooks locally, expose it with a temporary public tunnel, then set its `/webhook` URL in the LINE Developers Console.
+
+伺服器預設使用 `3000` 連接埠。本機要接收 LINE webhook 時，請使用暫時的公開 tunnel，並在 LINE Developers Console 設定其 `/webhook` 網址。
+
+Install [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) first and ensure its executable is available on your `PATH`; `npm install` does not install it.
+
+請先安裝 [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)，並確認執行檔可透過 `PATH` 使用；`npm install` 不會安裝它。
+
+```bash
+npm run tunnel
+```
+
+After testing, set the LINE webhook URL back to the deployed Render URL.
+
+測試完成後，請將 LINE webhook URL 改回已部署的 Render 網址。
+
+## Tests and Manual Checks / 測試與手動檢查
+
+Test the rotation calculation without a network connection:
+
+在不使用網路的情況下測試輪值計算：
 
 ```bash
 npm run test:rotation
 ```
 
-Prints the current on-duty group and a 6-week rotation preview. Good for checking `config.js` changes (like `ROTATION_START_MONDAY` or `ROTATION_GROUPS`) instantly.
+Test the Upstash Redis connection with the environment variables in `.env`:
 
-### 2. Test the Upstash Redis connection
-
-```bash
-UPSTASH_REDIS_REST_URL=xxx UPSTASH_REDIS_REST_TOKEN=xxx npm run test:db
-```
-
-Reads your current stored state, does a round-trip write/read to confirm the connection works, then cleans up after itself — your real data isn't touched.
-
-### 3. Run the server locally with auto-restart on save
+使用 `.env` 內的環境變數測試 Upstash Redis 連線：
 
 ```bash
-LINE_CHANNEL_ACCESS_TOKEN=xxx LINE_CHANNEL_SECRET=xxx CRON_SECRET=xxx \
-LINE_GROUP_ID=your-test-group-id \
-UPSTASH_REDIS_REST_URL=xxx UPSTASH_REDIS_REST_TOKEN=xxx \
-npm run dev
+npm run test:db
 ```
 
-Uses `nodemon`, so it restarts automatically whenever you save a file. **Use your test group's ID here, not the real household group's**, to avoid spamming your roommates while you're debugging.
+With the local server running, manually invoke the reminder endpoints. These commands send messages to the configured group, so use a test group.
 
-### 4. Trigger a specific reminder manually (no LINE webhook / no tunnel needed)
-
-With the server from step 3 running, open another terminal and run any of:
+本機伺服器啟動後，可手動呼叫提醒端點。這些指令會傳送訊息到設定的群組，請使用測試群組。
 
 ```bash
-CRON_SECRET=xxx npm run cron:weekly-kickoff
-CRON_SECRET=xxx npm run cron:midweek
-CRON_SECRET=xxx npm run cron:weekend
-CRON_SECRET=xxx npm run cron:monthly-todo
+npm run cron:weekly-kickoff
+npm run cron:midweek
+npm run cron:weekend
+npm run cron:monthly-todo
 ```
 
-Each one POSTs to the matching `/cron/*` endpoint on your local server, exactly like GitHub Actions would — the message goes straight to your test group. `CRON_SECRET` here must match the one you started the server with in step 3.
+## Group Commands / 群組指令
 
-### 5. Test buttons/commands (needs a public URL pointing at your local server)
-
-Only required for testing things LINE sends _to_ you — tapping the "完成" button or typing a command in the group. Use a temporary tunnel:
-
-```bash
-# Option A: cloudflared (no account needed, fastest to set up)
-npm run tunnel
-
-# Option B: ngrok (needs a free account)
-ngrok http 3000
-```
-
-Either gives you a temporary public URL like `https://xxxx.trycloudflare.com`. Then:
-
-1. Go to LINE Developers Console → Messaging API → Webhook URL, temporarily set it to `https://xxxx.trycloudflare.com/webhook`
-2. Click Verify to confirm it succeeds
-3. Tap buttons / type commands in your test group and watch your local terminal logs
-4. **Remember to switch the Webhook URL back to your Render URL afterward**, or your production bot will stop receiving events
-
-### Recommended workflow
-
-1. Make your change
-2. `npm run test:rotation` and/or `npm run test:db` for pure logic/data changes
-3. `npm run dev` + `npm run cron:*` to test outbound messages
-4. Only spin up a tunnel (step 5) if you touched button/command handling
-5. Once it all works locally, commit and push — Render will redeploy automatically
+| Command                      | Description                                                                                     | 說明                                             |
+| ---------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `/狀態`                      | Show this week's chore progress.                                                                | 查看本週值日進度。                               |
+| `/todo` or `/待辦`           | Show the monthly to-do list.                                                                    | 查看當月待辦清單。                               |
+| `/todo 新增 <text>`          | Add a shared to-do item.                                                                        | 新增共用待辦事項。                               |
+| `/todo 完成 <number>`        | Mark a numbered to-do item complete.                                                            | 將指定編號的待辦標記完成。                       |
+| `/groupid`                   | Print the current LINE group ID in the server logs.                                             | 在伺服器 log 顯示目前 LINE 群組 ID。             |
+| `/turn-check` or `/輪值檢查` | Compare the deployed rotation configuration with this week's stored group.                      | 比對目前部署的輪值設定與本週已儲存的組別。       |
+| `/turn-sync` or `/輪值同步`  | Sync this week's stored group to the current configuration while preserving completion records. | 將本週已儲存的組別同步為目前設定，保留完成紀錄。 |
