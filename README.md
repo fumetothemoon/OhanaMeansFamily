@@ -19,7 +19,8 @@ Scheduling is performed by GitHub Actions, while task and to-do state is stored 
 
 排程由 GitHub Actions 執行，值日與待辦狀態儲存在 Upstash Redis。因此機器人可部署在閒置時會休眠的服務，例如 Render 免費方案。
 
-## Getting Started 開始使用
+<a id="getting-started-開始使用"></a>
+## Getting Started / 開始使用
 
 Create and configure a LINE Official Account and Messaging API channel before running the bot locally or deploying it, then follow these in order:
 請先建立並設定 LINE 官方帳號與 Messaging API channel，接著依序完成以下步驟：
