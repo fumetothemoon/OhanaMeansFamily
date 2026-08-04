@@ -69,6 +69,10 @@ The server listens on port `3000` by default. To receive LINE webhooks locally, 
 
 伺服器預設使用 `3000` 連接埠。本機要接收 LINE webhook 時，請使用暫時的公開 tunnel，並在 LINE Developers Console 設定其 `/webhook` 網址。
 
+Install [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) first and ensure its executable is available on your `PATH`; `npm install` does not install it.
+
+請先安裝 [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)，並確認執行檔可透過 `PATH` 使用；`npm install` 不會安裝它。
+
 ```bash
 npm run tunnel
 ```
