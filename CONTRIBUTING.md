@@ -1,5 +1,8 @@
 # Contributing to OhanaMeansFamily
 
+This file is for anyone modifying the code, reporting a bug, or opening a pull request against this repo — not required reading if you just want to run your own copy (see [Getting Started](README.md#getting-started-開始使用) in the README instead).
+這份文件適用於想要修改程式碼、回報問題、或提交 pull request 的人 — 如果你只是想跑自己的一份，不需要先讀這個（請見 README 的 Getting Started 章節）。
+
 ## Labels 標籤說明
 
 | Label           | Use for                                                                                             | 用於                                                            |
