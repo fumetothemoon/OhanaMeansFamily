@@ -15,6 +15,20 @@ OhanaMeansFamily 是給家庭或室友群組使用的完美 LINE 機器人，如
 - Lets everyone view, add, and complete shared monthly to-do items in the group.
 - 任何群組成員都能查看、新增與完成共用的每月待辦事項。
 
+## Usage Examples / 使用範例
+
+The bot sends the weekly chore list and lets group members mark each task complete directly from LINE.
+
+機器人會在 LINE 發送每週值日清單，群組成員可直接標記各項工作為完成。
+
+### Weekly Chore Reminder / 每週值日提醒
+
+![Weekly chore reminder with completion buttons](docs/images/weekly-chore-reminder.jpg)
+
+### Chore Completion / 工作完成回報
+
+![Chore completion progress and confirmation](docs/images/chore-completion.jpg)
+
 Scheduling is performed by GitHub Actions, while task and to-do state is stored in Upstash Redis. The bot can therefore run on a service that sleeps while idle, such as Render's free plan.
 
 排程由 GitHub Actions 執行，值日與待辦狀態儲存在 Upstash Redis。因此機器人可部署在閒置時會休眠的服務，例如 Render 免費方案。
