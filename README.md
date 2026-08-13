@@ -21,19 +21,16 @@ The bot sends the weekly chore list and lets group members mark each task comple
 
 機器人會在 LINE 發送每週值日清單，群組成員可直接標記各項工作為完成。
 
-### Weekly Chore Reminder / 每週值日提醒
-
-![Weekly chore reminder with completion buttons](docs/images/weekly-chore-reminder.jpg)
-
-### Chore Completion / 工作完成回報
-
-![Chore completion progress and confirmation](docs/images/chore-completion.jpg)
+| Weekly Chore Reminder / 每週值日提醒                                                    | Chore Completion / 工作完成回報                                                 |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| ![Weekly chore reminder with completion buttons](docs/images/weekly-chore-reminder.jpg) | ![Chore completion progress and confirmation](docs/images/chore-completion.jpg) |
 
 Scheduling is performed by GitHub Actions, while task and to-do state is stored in Upstash Redis. The bot can therefore run on a service that sleeps while idle, such as Render's free plan.
 
 排程由 GitHub Actions 執行，值日與待辦狀態儲存在 Upstash Redis。因此機器人可部署在閒置時會休眠的服務，例如 Render 免費方案。
 
 <a id="getting-started-開始使用"></a>
+
 ## Getting Started / 開始使用
 
 Create and configure a LINE Official Account and Messaging API channel before running the bot locally or deploying it, then follow these in order:
