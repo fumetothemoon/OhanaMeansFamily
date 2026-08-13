@@ -15,22 +15,35 @@ OhanaMeansFamily 是給家庭或室友群組使用的完美 LINE 機器人，如
 - Lets everyone view, add, and complete shared monthly to-do items in the group.
 - 任何群組成員都能查看、新增與完成共用的每月待辦事項。
 
+## Usage Examples / 使用範例
+
+The bot sends the weekly chore list and lets group members mark each task complete directly from LINE.
+
+機器人會在 LINE 發送每週值日清單，群組成員可直接標記各項工作為完成。
+
+| Weekly Chore Reminder / 每週值日提醒                              | Midweek Unfinished Chores Reminder / 週中未完成任務提醒                                   |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| ![Weekly chore reminder](docs/images/weekly-chore-reminder.jpg)   | ![Midweek unfinished chores reminder](docs/images/midweek-unfinished-chores-reminder.jpg) |
+| Single Chore Completed / 單一任務完成回報                         | All Chores Completed / 全部任務完成                                                       |
+| ![Single chore completed](docs/images/single-chore-completed.jpg) | ![All chores completed](docs/images/all-chores-completed.jpg)                             |
+
 Scheduling is performed by GitHub Actions, while task and to-do state is stored in Upstash Redis. The bot can therefore run on a service that sleeps while idle, such as Render's free plan.
 
 排程由 GitHub Actions 執行，值日與待辦狀態儲存在 Upstash Redis。因此機器人可部署在閒置時會休眠的服務，例如 Render 免費方案。
 
 <a id="getting-started-開始使用"></a>
+
 ## Getting Started / 開始使用
 
 Create and configure a LINE Official Account and Messaging API channel before running the bot locally or deploying it, then follow these in order:
 請先建立並設定 LINE 官方帳號與 Messaging API channel，接著依序完成以下步驟：
 
-1. See [LINE setup](LINE_SETUP.md) for the account, channel, token, and group-invitation steps.
-   請參閱 [LINE 設定指南](LINE_SETUP.md)，完成帳號、channel、token 與邀請機器人進群組的步驟。
+1. See [LINE setup](docs/LINE_SETUP.md) for the account, channel, token, and group-invitation steps.
+   請參閱 [LINE 設定指南](docs/LINE_SETUP.md)，完成帳號、channel、token 與邀請機器人進群組的步驟。
 2. Clone this repo and set up local development (see below).
    Clone 這個 repo 並設定本機開發環境（見下方）。
-3. See [deployment](DEPLOYMENT.md) for Upstash Redis, Render, and GitHub Actions configuration.
-   請參閱 [部署指南](DEPLOYMENT.md)，完成 Upstash Redis、Render 與 GitHub Actions 的設定。
+3. See [deployment](docs/DEPLOYMENT.md) for Upstash Redis, Render, and GitHub Actions configuration.
+   請參閱 [部署指南](docs/DEPLOYMENT.md)，完成 Upstash Redis、Render 與 GitHub Actions 的設定。
 
 Want to modify the code or report a bug? See [CONTRIBUTING.md](CONTRIBUTING.md).
 想修改程式碼或回報問題？請見 [CONTRIBUTING.md](CONTRIBUTING.md)。
