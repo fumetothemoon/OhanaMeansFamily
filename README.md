@@ -36,12 +36,12 @@ Scheduling is performed by GitHub Actions, while task and to-do state is stored 
 Create and configure a LINE Official Account and Messaging API channel before running the bot locally or deploying it, then follow these in order:
 請先建立並設定 LINE 官方帳號與 Messaging API channel，接著依序完成以下步驟：
 
-1. See [LINE setup](LINE_SETUP.md) for the account, channel, token, and group-invitation steps.
-   請參閱 [LINE 設定指南](LINE_SETUP.md)，完成帳號、channel、token 與邀請機器人進群組的步驟。
+1. See [LINE setup](docs/LINE_SETUP.md) for the account, channel, token, and group-invitation steps.
+   請參閱 [LINE 設定指南](docs/LINE_SETUP.md)，完成帳號、channel、token 與邀請機器人進群組的步驟。
 2. Clone this repo and set up local development (see below).
    Clone 這個 repo 並設定本機開發環境（見下方）。
-3. See [deployment](DEPLOYMENT.md) for Upstash Redis, Render, and GitHub Actions configuration.
-   請參閱 [部署指南](DEPLOYMENT.md)，完成 Upstash Redis、Render 與 GitHub Actions 的設定。
+3. See [deployment](docs/DEPLOYMENT.md) for Upstash Redis, Render, and GitHub Actions configuration.
+   請參閱 [部署指南](docs/DEPLOYMENT.md)，完成 Upstash Redis、Render 與 GitHub Actions 的設定。
 
 Want to modify the code or report a bug? See [CONTRIBUTING.md](CONTRIBUTING.md).
 想修改程式碼或回報問題？請見 [CONTRIBUTING.md](CONTRIBUTING.md)。
