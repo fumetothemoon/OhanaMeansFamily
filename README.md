@@ -21,9 +21,11 @@ The bot sends the weekly chore list and lets group members mark each task comple
 
 機器人會在 LINE 發送每週值日清單，群組成員可直接標記各項工作為完成。
 
-| Weekly Chore Reminder / 每週值日提醒                            | Chore Completion / 任務完成回報                                   | All Chores Completed / 完成所有任務                           |
-| --------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------- |
-| ![Weekly chore reminder](docs/images/weekly-chore-reminder.jpg) | ![Single chore completed](docs/images/single-chore-completed.jpg) | ![All chores completed](docs/images/all-chores-completed.jpg) |
+| Weekly Chore Reminder / 每週值日提醒                              | Midweek Unfinished Chores Reminder / 週中未完成任務提醒                                   |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| ![Weekly chore reminder](docs/images/weekly-chore-reminder.jpg)   | ![Midweek unfinished chores reminder](docs/images/midweek-unfinished-chores-reminder.jpg) |
+| Single Chore Completed / 單一任務完成回報                         | All Chores Completed / 全部任務完成                                                       |
+| ![Single chore completed](docs/images/single-chore-completed.jpg) | ![All chores completed](docs/images/all-chores-completed.jpg)                             |
 
 Scheduling is performed by GitHub Actions, while task and to-do state is stored in Upstash Redis. The bot can therefore run on a service that sleeps while idle, such as Render's free plan.
 
