@@ -3,6 +3,7 @@
 OhanaMeansFamily is a perfect LINE chatbot for your family/roommate group chat, if you don't want to fight over house chores.
 
 OhanaMeansFamily 是給家庭或室友群組使用的完美 LINE 機器人，如果你們不想為了做家事而吵架的話。
+![Ohana means family](docs/images/ohana-means-family.jpg)
 
 ## Features / 功能
 
