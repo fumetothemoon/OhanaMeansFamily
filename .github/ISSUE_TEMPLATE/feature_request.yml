@@ -1,0 +1,84 @@
+name: Feature request
+description: Suggest a new feature, change, or task
+title: "[Area] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use the title format `[Area] short description`.
+        請使用 `[Area] short description` 標題格式。
+
+  - type: input
+    id: area
+    attributes:
+      label: Area 區域
+      description: Choose the affected area for the issue title. 選擇受影響的區域並填入 issue 標題。
+      placeholder: Core, Docs, Deploy, LINE, or Redis
+    validations:
+      required: true
+
+  - type: dropdown
+    id: suggested-label
+    attributes:
+      label: Suggested Label 建議標籤
+      description: Select the label that best describes this request. 選擇最符合此需求的標籤。
+      options:
+        - enhancement
+        - refactor
+        - chore
+        - documentation
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context 背景
+      placeholder: |
+        Why this work is needed, or what prompted it.
+        為什麼需要做這件事，或這個需求從何而來。
+    validations:
+      required: true
+
+  - type: textarea
+    id: work-needed
+    attributes:
+      label: What Needs to Be Done 需要做什麼
+      placeholder: |
+        Concrete description of the change, feature, or task.
+        具體描述要做的變更、功能或任務。
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope 範圍
+      placeholder: |
+        - What's included
+        - What's explicitly out of scope (if relevant)
+        - 包含的項目
+        - 明確不包含的項目（如適用）
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria 驗收標準
+      placeholder: |
+        How to verify this was done correctly.
+        如何驗證這件事有正確完成。
+    validations:
+      required: true
+
+  - type: input
+    id: related-issue
+    attributes:
+      label: Related Issue 相關 Issue
+      description: Add an issue number when applicable. 如適用，請填寫相關 issue 編號。
+      placeholder: "Relates to #123（若適用）"
+    validations:
+      required: false
