@@ -1,5 +1,5 @@
-name: Bug report
-description: Report something that is broken or behaving incorrectly
+name: Bug report 回報問題
+description: Report something that is broken or behaving incorrectly. 回報損壞或行為不正確的內容。
 title: "[Area] "
 labels:
   - bug
