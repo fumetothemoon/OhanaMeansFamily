@@ -1,0 +1,83 @@
+name: Bug report 回報問題
+description: Report something that is broken or behaving incorrectly. 回報損壞或行為不正確的內容。
+title: "[Area] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use the title format `[Area] short description`.
+        請使用 `[Area] short description` 標題格式。
+
+  - type: input
+    id: area
+    attributes:
+      label: Area 區域
+      description: Choose the affected area for the issue title. 選擇受影響的區域並填入 issue 標題。
+      placeholder: Core, Docs, Deploy, LINE, or Redis
+    validations:
+      required: true
+
+  - type: dropdown
+    id: suggested-label
+    attributes:
+      label: Suggested Label 建議標籤
+      description: Select the label that best describes this report. 選擇最符合此回報的標籤。
+      options:
+        - bug
+        - question
+        - duplicate
+        - invalid
+        - wontfix
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to Reproduce 重現步驟
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior 預期行為
+      placeholder: |
+        What should have happened.
+        應該發生的結果。
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior 實際行為
+      placeholder: |
+        What actually happened instead.
+        實際發生的結果。
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment 環境
+      placeholder: |
+        - Local dev / Production 本機測試 / 正式環境:
+        - Node version (if local) Node 版本（若為本機）:
+        - Relevant log output 相關的錯誤訊息或 log:
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context 其他背景資訊
+      description: Add screenshots, logs, or other useful context. 加入螢幕截圖、log 或其他有用的背景資訊。
+    validations:
+      required: false
