@@ -47,12 +47,6 @@ What should have happened.
 
 What actually happened instead.
 實際發生的結果。
-
-## Environment 環境
-
-- Local dev / Production 本機測試 / 正式環境:
-- Node version (if local) Node 版本（若為本機）:
-- Relevant log output 相關的錯誤訊息或 log:
 ```
 
 ---

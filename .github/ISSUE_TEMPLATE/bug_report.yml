@@ -3,6 +3,8 @@ description: Report something that is broken or behaving incorrectly. 回報損�
 title: "[Area] "
 labels:
   - bug
+assignees:
+  - fumetothemoon
 body:
   - type: markdown
     attributes:
@@ -16,20 +18,6 @@ body:
       label: Area 區域
       description: Choose the affected area for the issue title. 選擇受影響的區域並填入 issue 標題。
       placeholder: Core, Docs, Deploy, LINE, or Redis
-    validations:
-      required: true
-
-  - type: dropdown
-    id: suggested-label
-    attributes:
-      label: Suggested Label 建議標籤
-      description: Select the label that best describes this report. 選擇最符合此回報的標籤。
-      options:
-        - bug
-        - question
-        - duplicate
-        - invalid
-        - wontfix
     validations:
       required: true
 
@@ -60,17 +48,6 @@ body:
       placeholder: |
         What actually happened instead.
         實際發生的結果。
-    validations:
-      required: true
-
-  - type: textarea
-    id: environment
-    attributes:
-      label: Environment 環境
-      placeholder: |
-        - Local dev / Production 本機測試 / 正式環境:
-        - Node version (if local) Node 版本（若為本機）:
-        - Relevant log output 相關的錯誤訊息或 log:
     validations:
       required: true
 
