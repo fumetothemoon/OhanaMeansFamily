@@ -3,6 +3,8 @@ description: Suggest a new feature, change, or task. 建議新的功能、變更
 title: "[Area] "
 labels:
   - enhancement
+assignees:
+  - fumetothemoon
 body:
   - type: markdown
     attributes:
@@ -16,19 +18,6 @@ body:
       label: Area 區域
       description: Choose the affected area for the issue title. 選擇受影響的區域並填入 issue 標題。
       placeholder: Core, Docs, Deploy, LINE, or Redis
-    validations:
-      required: true
-
-  - type: dropdown
-    id: suggested-label
-    attributes:
-      label: Suggested Label 建議標籤
-      description: Select the label that best describes this request. 選擇最符合此需求的標籤。
-      options:
-        - enhancement
-        - refactor
-        - chore
-        - documentation
     validations:
       required: true
 
