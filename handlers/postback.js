@@ -28,6 +28,9 @@ async function handlePostback(event) {
 
   const week = await markTaskDone(weekKey, taskId, name);
   if (!week) return;
+  // A redelivered or repeated tap on a task that is already done: nothing new to announce.
+  // 重送或重複點擊已完成的任務：沒有新狀態，不重複發送訊息。
+  if (week.alreadyDone) return;
 
   // Reply with the full checklist so everyone sees the live state, not just this one task.
   // 回覆完整的勾選清單，讓大家看到最新狀態，而不只是這一項工作。
@@ -39,14 +42,29 @@ async function handlePostback(event) {
     members: week.members,
     tasks: week.tasks,
   });
-  await client.replyMessage({
-    replyToken: event.replyToken,
-    messages: [flex],
-  });
+  await replyOrPush(event, flex);
 
   if (isWeekFullyDone(week)) {
     await pushToGroup(buildAllDoneMessage(week.groupName));
   }
+}
+
+// Reply tokens expire shortly after the event. If the server was asleep (cold start) or the event
+// was redelivered by LINE, the token may already be invalid — fall back to a push message so the
+// group still sees the update. Push messages count toward the monthly message quota.
+// Reply token 在事件發生後很快就會失效。若伺服器剛從休眠喚醒，或事件是 LINE 重送的，token 可能已失效，
+// 此時改用推播訊息，讓群組仍能看到更新。推播訊息會計入每月訊息額度。
+async function replyOrPush(event, message) {
+  const isRedelivery = event.deliveryContext && event.deliveryContext.isRedelivery;
+  if (!isRedelivery && event.replyToken) {
+    try {
+      await client.replyMessage({ replyToken: event.replyToken, messages: [message] });
+      return;
+    } catch (e) {
+      console.warn("Reply failed, falling back to push 回覆失敗，改用推播:", e.message);
+    }
+  }
+  await pushToGroup(message);
 }
 
 module.exports = { handlePostback };
