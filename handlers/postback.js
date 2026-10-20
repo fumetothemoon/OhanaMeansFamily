@@ -35,7 +35,7 @@ async function handlePostback(event) {
   const task = week.tasks.find((t) => t.id === Number(taskId));
   if (task.checklistNotificationDelivered === false) {
     const flex = buildDutyFlex({
-      title: `✅ ${name} 完成了「${task.label}」`,
+      title: `✅ ${task.doneBy} 完成了「${task.label}」`,
       weekKey,
       groupName: week.groupName,
       members: week.members,
