@@ -120,7 +120,11 @@ async function handleTextMessage(event) {
   // Add a to-do item: /todo 新增 <content>. 新增待辦：/todo 新增 內容。
   const addMatch = text.match(/^\/todo\s+新增\s+(.+)$/);
   if (addMatch) {
-    const todo = await addTodo(addMatch[1].trim(), name);
+    const todo = await addTodo(
+      addMatch[1].trim(),
+      name,
+      event.webhookEventId,
+    );
     return client.replyMessage({
       replyToken: event.replyToken,
       messages: [

@@ -1,7 +1,10 @@
 // Handles LINE postback events — i.e. someone tapping a "完成" button.
 // 處理 LINE 的 postback 事件，也就是有人按下「完成」按鈕。
 
-const { markTaskDone, isWeekFullyDone } = require("../lib/rotation");
+const {
+  markTaskDone,
+  markNotificationDelivered,
+} = require("../lib/rotation");
 const { buildDutyFlex, buildAllDoneMessage } = require("../lib/messages");
 const { client, getDisplayName, pushToGroup } = require("../lib/lineClient");
 
@@ -28,24 +31,23 @@ async function handlePostback(event) {
 
   const week = await markTaskDone(weekKey, taskId, name);
   if (!week) return;
-  // A redelivered or repeated tap on a task that is already done: nothing new to announce.
-  // 重送或重複點擊已完成的任務：沒有新狀態，不重複發送訊息。
-  if (week.alreadyDone) return;
 
-  // Reply with the full checklist so everyone sees the live state, not just this one task.
-  // 回覆完整的勾選清單，讓大家看到最新狀態，而不只是這一項工作。
   const task = week.tasks.find((t) => t.id === Number(taskId));
-  const flex = buildDutyFlex({
-    title: `✅ ${name} 完成了「${task.label}」`,
-    weekKey,
-    groupName: week.groupName,
-    members: week.members,
-    tasks: week.tasks,
-  });
-  await replyOrPush(event, flex);
+  if (task.checklistNotificationDelivered === false) {
+    const flex = buildDutyFlex({
+      title: `✅ ${name} 完成了「${task.label}」`,
+      weekKey,
+      groupName: week.groupName,
+      members: week.members,
+      tasks: week.tasks,
+    });
+    await replyOrPush(event, flex);
+    await markNotificationDelivered(weekKey, taskId, "checklist");
+  }
 
-  if (isWeekFullyDone(week)) {
+  if (week.allDoneNotificationDelivered === false) {
     await pushToGroup(buildAllDoneMessage(week.groupName));
+    await markNotificationDelivered(weekKey, taskId, "allDone");
   }
 }
 
