@@ -10,13 +10,12 @@ const { handleTextMessage } = require("../handlers/commands");
 const router = express.Router();
 
 router.post("/webhook", line.middleware(lineConfig), async (req, res) => {
-  // Acknowledge LINE immediately, then process events in the background.
-  // 先立即回應 LINE 避免逾時重送，事件則在背景處理。
-  res.status(200).end();
   try {
     await Promise.all((req.body.events || []).map(handleEvent));
+    res.status(200).end();
   } catch (e) {
     console.error("Error handling event(s) 處理事件時發生錯誤:", e);
+    res.status(500).end();
   }
 });
 

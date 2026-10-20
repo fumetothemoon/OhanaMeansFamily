@@ -1,17 +1,24 @@
 name: OhanaMeansFamily reminders
 
+# All times are UTC; Taiwan Time is UTC + 8.
+#   Monday 17:07 Taiwan Time -> Monday 09:07 UTC
+#   Wednesday 16:37 Taiwan Time -> Wednesday 08:37 UTC
+#   Sunday 16:37 Taiwan Time -> Sunday 08:37 UTC
+#   The 1st of each month at 08:37 Taiwan Time -> the 1st of each month at 00:37 UTC
+#   Schedules intentionally avoid the top of the hour (:37), when GitHub's cron runs are busiest and often delayed by minutes to hours (#12).
 # 時間都是 UTC，台灣時間 = UTC + 8
-#   週一 17:00 台灣 -> 週一 09:00 UTC
-#   週三 17:00 台灣 -> 週三 09:00 UTC
-#   週日 17:00 台灣 -> 週日 09:00 UTC
-#   每月 1 號 09:00 台灣 -> 每月 1 號 01:00 UTC
+#   週一 17:07 台灣 -> 週一 09:07 UTC
+#   週三 16:37 台灣 -> 週三 08:37 UTC
+#   週日 16:37 台灣 -> 週日 08:37 UTC
+#   每月 1 號 08:37 台灣 -> 每月 1 號 00:37 UTC
+#   排程刻意避開整點（:37），因為 GitHub 在整點排程最擁擠，常延遲數分鐘到數小時（#12）。
 on:
   schedule:
-    - cron: "0 9 * * 1" # 週一 17:00 台灣時間：本週任務清單
-    - cron: "0 9 * * 3" # 週三 17:00 台灣時間：週間提醒
-    - cron: "0 9 * * 0" # 週日 17:00 台灣時間：週末提醒
-    - cron: "0 1 1 * *" # 每月 1 號 09:00 台灣時間：待辦清單提醒
-  workflow_dispatch: # 也可以手動到 GitHub 上按按鈕測試觸發
+    - cron: "7 9 * * 1" # Monday 17:07 Taiwan Time: this week's task list / 週一 17:07 台灣時間：本週任務清單
+    - cron: "37 8 * * 3" # Wednesday 16:37 Taiwan Time: midweek reminder / 週三 16:37 台灣時間：週間提醒
+    - cron: "37 8 * * 0" # Sunday 16:37 Taiwan Time: weekend reminder / 週日 16:37 台灣時間：週末提醒
+    - cron: "37 0 1 * *" # 1st of each month 08:37 Taiwan Time: todo reminder / 每月 1 號 08:37 台灣時間：待辦清單提醒
+  workflow_dispatch: # Run a test trigger manually from GitHub / 也可以手動到 GitHub 上按按鈕測試觸發
     inputs:
       job:
         description: "要測試哪一個提醒"
@@ -36,10 +43,10 @@ jobs:
           else
             cron="${{ github.event.schedule }}"
             case "$cron" in
-              "0 9 * * 1") echo "path=weekly-kickoff" >> "$GITHUB_OUTPUT" ;;
-              "0 9 * * 3") echo "path=midweek" >> "$GITHUB_OUTPUT" ;;
-              "0 9 * * 0") echo "path=weekend" >> "$GITHUB_OUTPUT" ;;
-              "0 1 1 * *") echo "path=monthly-todo" >> "$GITHUB_OUTPUT" ;;
+              "7 9 * * 1") echo "path=weekly-kickoff" >> "$GITHUB_OUTPUT" ;;
+              "37 8 * * 3") echo "path=midweek" >> "$GITHUB_OUTPUT" ;;
+              "37 8 * * 0") echo "path=weekend" >> "$GITHUB_OUTPUT" ;;
+              "37 0 1 * *") echo "path=monthly-todo" >> "$GITHUB_OUTPUT" ;;
             esac
           fi
 
