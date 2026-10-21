@@ -6,6 +6,7 @@ const {
   markNotificationDelivered,
   switchWeekGroup,
   markSwitchDelivered,
+  getOrCreateWeekState,
 } = require("../lib/rotation");
 const {
   buildDutyFlex,
@@ -52,7 +53,15 @@ async function handlePostback(event) {
       }
     }
     const name = (await getDisplayName(event.source)) || "室友";
-    await replyOrPush(event, buildDutySwitchMessages(weekKey, result.week, name));
+    // A pending retry keeps the original pick as history and reloads the checklist.
+    // 待確認的重送保留當初的選擇當作歷史確認，清單則重新讀取目前這一週。
+    const currentWeek = result.status === "pending"
+      ? await getOrCreateWeekState(weekKey)
+      : null;
+    await replyOrPush(
+      event,
+      buildDutySwitchMessages(weekKey, result.week, name, currentWeek),
+    );
     await markSwitchDelivered(event.webhookEventId);
     return;
   }

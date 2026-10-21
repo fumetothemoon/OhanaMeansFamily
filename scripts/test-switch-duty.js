@@ -80,7 +80,7 @@ class FakeRedis {
       storage.set(keys[1], JSON.stringify(event));
       return 1;
     }
-    if (script.includes("rotationAnchor")) {
+    if (script.includes("db.rotationAnchor = { weekKey = ARGV[1], groupIndex = tonumber(ARGV[2]) }")) {
       const eventId = args[2];
       const previousEvent = eventId && storage.get(keys[1]);
       if (previousEvent) {
@@ -119,9 +119,12 @@ class FakeRedis {
     if (script.includes("applyChanges")) {
       if (writeError) throw writeError;
       writes++;
-      const state = JSON.parse(storage.get(keys[0]) || "{}");
       const original = JSON.parse(args[0]);
       const updated = JSON.parse(args[1]);
+      // Match UPDATE_DB_SCRIPT: a missing key starts from the read snapshot.
+      // 與 UPDATE_DB_SCRIPT 一致：鍵不存在時從讀取時的快照開始合併。
+      const raw = storage.get(keys[0]);
+      const state = raw === undefined ? structuredClone(original) : JSON.parse(raw);
       const rotationChanged = state.rotationVersion !== original.rotationVersion;
       const applyChanges = (current, before, after) => {
         for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
@@ -407,6 +410,47 @@ test("switching preserves tasks, completion authors, timestamps, todos, and noti
   assert.ok(JSON.stringify(replies[0].messages[1]).includes("原完成者"));
 });
 
+test("a week-only first write on an empty database keeps default fields", async () => {
+  storage.delete(stateKey);
+  const { readDb, writeDb } = require("../lib/db");
+  const weekKey = rotation.getWeekKey();
+  const db = await readDb();
+  db.weeks[weekKey] = {
+    groupIndex: 1,
+    groupName: config.ROTATION_GROUPS[1].name,
+    members: config.ROTATION_GROUPS[1].members,
+    tasks: [{ id: 0, label: "倒垃圾", done: false, doneBy: null, doneAt: null }],
+  };
+  await writeDb(db);
+
+  const saved = savedState();
+  assert.equal(saved.weeks[weekKey].groupIndex, 1);
+  assert.deepEqual(saved.todos, {});
+  assert.equal(saved.nextTodoId, 1);
+  const reread = await readDb();
+  assert.deepEqual(reread.todos, []);
+  assert.equal(reread.nextTodoId, 1);
+  assert.equal(reread.weeks[weekKey].groupIndex, 1);
+});
+
+test("a todo-only first write on an empty database keeps default fields", async () => {
+  storage.delete(stateKey);
+  const { readDb, writeDb } = require("../lib/db");
+  const db = await readDb();
+  db.todos.push({ id: 1, text: "first todo", done: false });
+  db.nextTodoId = 2;
+  await writeDb(db);
+
+  const saved = savedState();
+  assert.deepEqual(saved.weeks, {});
+  assert.equal(saved.todos.at(-1).text, "first todo");
+  assert.equal(saved.nextTodoId, 2);
+  const reread = await readDb();
+  assert.deepEqual(reread.weeks, {});
+  assert.equal(reread.nextTodoId, 2);
+  assert.equal(reread.todos.at(-1).text, "first todo");
+});
+
 test("a todo committed before switching is preserved", async () => {
   const { readDb, writeDb } = require("../lib/db");
   const db = await readDb();
@@ -670,8 +714,13 @@ test("redelivery retries a pending confirmation without reapplying its switch", 
 
   replyError = null;
   pushError = null;
+  await rotation.markTaskDone(weekKey, 0, "原完成者");
   await handlePostback(pick(1, weekKey, "newer-event"));
   const stateAfterNewerSwitch = savedState();
+  const savedEvent = JSON.parse(storage.get("OhanaMeansFamily:webhook-event:pending-event"));
+  assert.equal(savedEvent.week.groupIndex, 0);
+  assert.equal(savedEvent.week.tasks[0].done, false);
+
   await handlePostback({
     ...firstSelection,
     deliveryContext: { isRedelivery: true },
@@ -681,7 +730,16 @@ test("redelivery retries a pending confirmation without reapplying its switch", 
   assert.equal(savedState().weeks[weekKey].groupIndex, 1);
   assert.equal(JSON.parse(storage.get("OhanaMeansFamily:webhook-event:pending-event"))
     .deliveryStatus, "delivered");
-  assert.equal(pushes.at(-1).length, 2);
+  const confirmation = pushes.at(-1);
+  assert.equal(confirmation.length, 2);
+  assert.match(confirmation[0].text, new RegExp(`當時選擇 ${config.ROTATION_GROUPS[0].name}`));
+  assert.ok(confirmation[0].text.includes("測試室友"));
+  assert.doesNotMatch(confirmation[0].text, /本週值日/);
+  assert.doesNotMatch(confirmation[0].text, /之後每週從此組/);
+  const status = await command("/狀態");
+  assert.deepEqual(confirmation[1], status[0]);
+  assert.ok(confirmation[1].altText.includes(config.ROTATION_GROUPS[1].name));
+  assert.ok(JSON.stringify(confirmation[1]).includes("原完成者"));
 });
 
 test("expired reply tokens use the existing push fallback for both messages", async () => {
