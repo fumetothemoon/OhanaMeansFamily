@@ -17,6 +17,18 @@ let rotation;
 let handleTextMessage;
 let handlePostback;
 
+function cjsonRoundTrip(value) {
+  if (Array.isArray(value)) {
+    return value.length === 0 ? {} : value.map(cjsonRoundTrip);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, cjsonRoundTrip(item)]),
+    );
+  }
+  return value;
+}
+
 class FakeRedis {
   async get(key) {
     if (readError) throw readError;
@@ -35,24 +47,41 @@ class FakeRedis {
   }
 
   async eval(script, keys, args) {
-    if (script.includes("rotationAnchor")) {
+    if (script.includes("webhookEventId") && script.includes("rotationAnchor")) {
       const eventId = args[2];
       if (eventId && storage.has(keys[1])) {
-        return JSON.stringify({ status: "duplicate" });
+        if (storage.has(keys[2])) return JSON.stringify({ status: "delivered" });
+        const savedEvent = JSON.parse(storage.get(keys[1]));
+        return JSON.stringify({ status: "pending", week: savedEvent.week });
       }
       if (writeError) throw writeError;
       writes++;
       const db = JSON.parse(storage.get(keys[0]) || '{"weeks":{},"todos":[],"nextTodoId":1}');
+      const weekWasMissing = db.weeks[args[0]] === undefined;
       const week = db.weeks[args[0]] || JSON.parse(args[3]);
       const group = JSON.parse(args[4]);
+      const anchor = db.rotationAnchor;
+      const rotationChanged = weekWasMissing ||
+        week.groupIndex !== Number(args[1]) ||
+        week.groupName !== group.name ||
+        !anchor ||
+        anchor.weekKey !== args[0] ||
+        Number(anchor.groupIndex) !== Number(args[1]);
       week.groupIndex = Number(args[1]);
       week.groupName = group.name;
       week.members = group.members;
       db.weeks[args[0]] = week;
       db.rotationAnchor = { weekKey: args[0], groupIndex: Number(args[1]) };
-      storage.set(keys[0], JSON.stringify(db));
-      if (eventId) storage.set(keys[1], "1");
+      if (rotationChanged) db.rotationVersion = (Number(db.rotationVersion) || 0) + 1;
+      storage.set(keys[0], JSON.stringify(cjsonRoundTrip(db)));
+      if (eventId) storage.set(keys[1], JSON.stringify({ week }));
       return JSON.stringify({ status: "switched", week });
+    }
+    if (script.includes('redis.call("SET", KEYS[2], "1", "EX"')) {
+      if (writeError) throw writeError;
+      writes++;
+      storage.set(keys[1], "1");
+      return "OK";
     }
     if (script.includes("applyChanges")) {
       if (writeError) throw writeError;
@@ -60,11 +89,45 @@ class FakeRedis {
       const state = JSON.parse(storage.get(keys[0]) || "{}");
       const original = JSON.parse(args[0]);
       const updated = JSON.parse(args[1]);
+      const rotationChanged = state.rotationVersion !== original.rotationVersion;
+      const isIdArray = (value) => Array.isArray(value) &&
+        value.length > 0 &&
+        value.every((item) => item && typeof item === "object" && item.id !== undefined);
+      const mergeIdArray = (current, before, after) => {
+        const merged = Array.isArray(current) ? structuredClone(current) : [];
+        const originalById = new Map(before.map((item) => [String(item.id), item]));
+        const updatedById = new Map(after.map((item) => [String(item.id), item]));
+        const currentById = new Map(merged.map((item) => [String(item.id), item]));
+        for (const id of originalById.keys()) {
+          if (updatedById.has(id)) continue;
+          const index = merged.findIndex((item) => String(item.id) === id);
+          if (index !== -1) merged.splice(index, 1);
+        }
+        for (const [id, item] of updatedById) {
+          const previous = originalById.get(id);
+          const currentItem = currentById.get(id);
+          if (!previous) {
+            if (!currentItem) merged.push(structuredClone(item));
+          } else if (
+            currentItem &&
+            !isDeepStrictEqual(previous, item)
+          ) {
+            applyChanges(currentItem, previous, item);
+          }
+        }
+        return merged;
+      };
       const applyChanges = (current, before, after) => {
         for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+          if (
+            rotationChanged &&
+            ["rotationAnchor", "rotationVersion", "groupIndex", "groupName", "members"].includes(key)
+          ) continue;
           if (isDeepStrictEqual(before[key], after[key])) continue;
           if (!Object.prototype.hasOwnProperty.call(after, key)) {
             delete current[key];
+          } else if (isIdArray(before[key]) && isIdArray(after[key])) {
+            current[key] = mergeIdArray(current[key], before[key], after[key]);
           } else if (
             before[key] &&
             after[key] &&
@@ -83,7 +146,7 @@ class FakeRedis {
         }
       };
       applyChanges(state, original, updated);
-      storage.set(keys[0], JSON.stringify(state));
+      storage.set(keys[0], JSON.stringify(cjsonRoundTrip(state)));
       return "OK";
     }
     const key = `${keys[1]}:${args[0]}`;
@@ -206,7 +269,11 @@ test("a switch initializes an empty database without requiring a prior status co
   assert.equal(week.groupIndex, 1);
   assert.equal(week.tasks.length, config.DUTY_TASKS.length);
   assert.ok(week.tasks.every((task) => !task.done));
-  assert.deepEqual(state.todos, []);
+  assert.deepEqual(state.todos, {});
+  const { readDb } = require("../lib/db");
+  assert.deepEqual((await readDb()).todos, []);
+  assert.deepEqual(await require("../lib/todos").listTodos({ onlyOpen: true }), []);
+  await command("/todo");
   assert.equal(state.nextTodoId, 1);
 });
 
@@ -316,6 +383,37 @@ test("a stale task-completion write cannot erase a newer rotation anchor", async
   assert.equal(state.weeks[weekKey].groupIndex, 1);
   assert.equal(state.weeks[weekKey].tasks[0].doneBy, "測試室友");
   assert.deepEqual(state.rotationAnchor, { weekKey, groupIndex: 1 });
+});
+
+test("a stale group writer cannot overwrite a newer duty switch", async () => {
+  const weekKey = rotation.getWeekKey();
+  await rotation.getOrCreateWeekState(weekKey);
+  const { readDb, writeDb } = require("../lib/db");
+  const staleDb = await readDb();
+  const previousGroup = config.ROTATION_GROUPS[staleDb.weeks[weekKey].groupIndex];
+
+  await rotation.switchWeekGroup(weekKey, 1);
+  staleDb.weeks[weekKey].groupIndex = config.ROTATION_GROUPS.indexOf(previousGroup);
+  staleDb.weeks[weekKey].groupName = previousGroup.name;
+  staleDb.weeks[weekKey].members = previousGroup.members;
+  await writeDb(staleDb);
+
+  const state = savedState();
+  assert.equal(state.weeks[weekKey].groupIndex, 1);
+  assert.deepEqual(state.rotationAnchor, { weekKey, groupIndex: 1 });
+});
+
+test("a stale todo completion preserves a concurrently added todo", async () => {
+  const { readDb, writeDb } = require("../lib/db");
+  const staleDb = await readDb();
+  const { addTodo } = require("../lib/todos");
+  await addTodo("concurrent todo", "測試室友");
+  staleDb.todos[0].done = true;
+  await writeDb(staleDb);
+
+  assert.equal(savedState().todos.length, 2);
+  assert.equal(savedState().todos[0].done, true);
+  assert.equal(savedState().todos[1].text, "concurrent todo");
 });
 
 test("current group, previous week's group, and repeated picks all re-anchor consistently", async () => {
@@ -450,6 +548,35 @@ test("redelivery of an earlier switch cannot overwrite a newer switch", async ()
   assert.deepEqual(savedState().rotationAnchor, { weekKey, groupIndex: 1 });
   assert.equal(replies.length, 2);
   assert.equal(pushes.length, 0);
+});
+
+test("a redelivery retries failed confirmation without reapplying an old switch", async () => {
+  const weekKey = rotation.getWeekKey();
+  const selectionA = pick(0, weekKey, "event-a");
+  replyError = new Error("reply failed");
+  pushError = new Error("push failed");
+  await assert.rejects(handlePostback(selectionA), /push failed/);
+  replyError = null;
+  pushError = null;
+
+  await handlePostback(pick(1, weekKey, "event-b"));
+  const stateAfterB = savedState();
+  await handlePostback({
+    ...selectionA,
+    deliveryContext: { isRedelivery: true },
+  });
+
+  assert.deepEqual(savedState(), stateAfterB);
+  assert.equal(savedState().weeks[weekKey].groupIndex, 1);
+  assert.deepEqual(savedState().rotationAnchor, { weekKey, groupIndex: 1 });
+  assert.equal(pushes.length, 1);
+  assert.ok(pushes[0][0].text.includes(config.ROTATION_GROUPS[0].name));
+
+  await handlePostback({
+    ...selectionA,
+    deliveryContext: { isRedelivery: true },
+  });
+  assert.equal(pushes.length, 1);
 });
 
 test("expired reply tokens use the existing push fallback for both messages", async () => {

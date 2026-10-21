@@ -5,6 +5,7 @@ const {
   markTaskDone,
   markNotificationDelivered,
   switchWeekGroup,
+  markSwitchEventDelivered,
 } = require("../lib/rotation");
 const {
   buildDutyFlex,
@@ -39,8 +40,14 @@ async function handlePostback(event) {
     const rawGroup = data.get("group");
     const groupIndex = /^\d+$/.test(rawGroup || "") ? Number(rawGroup) : NaN;
     const result = await switchWeekGroup(weekKey, groupIndex, event.webhookEventId);
-    if (result.status === "duplicate") return;
+    if (result.status === "delivered") return;
     if (result.status !== "switched") {
+      if (result.status === "pending") {
+        const name = (await getDisplayName(event.source)) || "室友";
+        await replyOrPush(event, buildDutySwitchMessages(weekKey, result.week, name));
+        await markSwitchEventDelivered(event.webhookEventId);
+        return;
+      }
       return replyOrPush(event, {
         type: "text",
         text: result.status === "stale"
@@ -49,7 +56,9 @@ async function handlePostback(event) {
       });
     }
     const name = (await getDisplayName(event.source)) || "室友";
-    return replyOrPush(event, buildDutySwitchMessages(weekKey, result.week, name));
+    await replyOrPush(event, buildDutySwitchMessages(weekKey, result.week, name));
+    await markSwitchEventDelivered(event.webhookEventId);
+    return;
   }
   if (action !== "done") return;
 
