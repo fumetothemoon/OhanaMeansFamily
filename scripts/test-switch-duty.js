@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const { isDeepStrictEqual } = require("node:util");
 const { test, beforeEach, after, mock } = require("node:test");
 const dayjs = require("dayjs");
 const config = require("../config");
@@ -52,6 +53,38 @@ class FakeRedis {
       storage.set(keys[0], JSON.stringify(db));
       if (eventId) storage.set(keys[1], "1");
       return JSON.stringify({ status: "switched", week });
+    }
+    if (script.includes("applyChanges")) {
+      if (writeError) throw writeError;
+      writes++;
+      const state = JSON.parse(storage.get(keys[0]) || "{}");
+      const original = JSON.parse(args[0]);
+      const updated = JSON.parse(args[1]);
+      const applyChanges = (current, before, after) => {
+        for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+          if (isDeepStrictEqual(before[key], after[key])) continue;
+          if (!Object.prototype.hasOwnProperty.call(after, key)) {
+            delete current[key];
+          } else if (
+            before[key] &&
+            after[key] &&
+            typeof before[key] === "object" &&
+            typeof after[key] === "object" &&
+            !Array.isArray(before[key]) &&
+            !Array.isArray(after[key])
+          ) {
+            if (!current[key] || typeof current[key] !== "object" || Array.isArray(current[key])) {
+              current[key] = {};
+            }
+            applyChanges(current[key], before[key], after[key]);
+          } else {
+            current[key] = structuredClone(after[key]);
+          }
+        }
+      };
+      applyChanges(state, original, updated);
+      storage.set(keys[0], JSON.stringify(state));
+      return "OK";
     }
     const key = `${keys[1]}:${args[0]}`;
     if (script.includes("HDEL")) {
@@ -249,6 +282,40 @@ test("switching preserves tasks, completion authors, timestamps, todos, and noti
   assert.equal(afterState.nextTodoId, before.nextTodoId);
   assert.equal(storage.get(`OhanaMeansFamily:notifications:${weekKey}`), notifications);
   assert.ok(JSON.stringify(replies[0].messages[1]).includes("原完成者"));
+});
+
+test("a todo committed before switching is preserved", async () => {
+  const { readDb, writeDb } = require("../lib/db");
+  const db = await readDb();
+  db.todos.push({ id: db.nextTodoId, text: "new todo", done: false });
+  db.nextTodoId++;
+  await writeDb(db);
+
+  const weekKey = rotation.getWeekKey();
+  await rotation.switchWeekGroup(weekKey, 1);
+
+  assert.equal(savedState().todos.at(-1).text, "new todo");
+  assert.deepEqual(savedState().rotationAnchor, { weekKey, groupIndex: 1 });
+});
+
+test("a stale task-completion write cannot erase a newer rotation anchor", async () => {
+  const weekKey = rotation.getWeekKey();
+  await rotation.getOrCreateWeekState(weekKey);
+  const { readDb, writeDb } = require("../lib/db");
+  const staleDb = await readDb();
+
+  await rotation.switchWeekGroup(weekKey, 1);
+  Object.assign(staleDb.weeks[weekKey].tasks[0], {
+    done: true,
+    doneBy: "測試室友",
+    doneAt: "2026-10-21 06:00",
+  });
+  await writeDb(staleDb);
+
+  const state = savedState();
+  assert.equal(state.weeks[weekKey].groupIndex, 1);
+  assert.equal(state.weeks[weekKey].tasks[0].doneBy, "測試室友");
+  assert.deepEqual(state.rotationAnchor, { weekKey, groupIndex: 1 });
 });
 
 test("current group, previous week's group, and repeated picks all re-anchor consistently", async () => {
