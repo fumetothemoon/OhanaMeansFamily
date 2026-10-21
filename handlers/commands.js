@@ -8,7 +8,11 @@ const {
   resetWeek,
   syncWeekGroup,
 } = require("../lib/rotation");
-const { buildDutyFlex, buildTodoListMessage } = require("../lib/messages");
+const {
+  buildDutyFlex,
+  buildTodoListMessage,
+  buildDutyGroupSelector,
+} = require("../lib/messages");
 const { listTodos, addTodo, completeTodo } = require("../lib/todos");
 const { client, getDisplayName } = require("../lib/lineClient");
 
@@ -19,6 +23,21 @@ function formatGroup(group) {
 async function handleTextMessage(event) {
   const text = event.message.text.trim();
   const name = (await getDisplayName(event.source)) || "室友";
+
+  if (text === "/switch-duty" || text === "/換班") {
+    if (event.source.type !== "group") {
+      return client.replyMessage({
+        replyToken: event.replyToken,
+        messages: [{ type: "text", text: "請在群組中輸入 /switch-duty 選擇值日組別。" }],
+      });
+    }
+    const weekKey = getWeekKey();
+    const week = await getOrCreateWeekState(weekKey);
+    return client.replyMessage({
+      replyToken: event.replyToken,
+      messages: [buildDutyGroupSelector(weekKey, week.groupIndex)],
+    });
+  }
 
   // Check this week's duty status. 查詢本週值日狀態。
   if (text === "/狀態" || text === "/status" || text === "/值日") {
@@ -37,11 +56,11 @@ async function handleTextMessage(event) {
     });
   }
 
-  // Compare this deployment's configured rotation with the saved group for this week.
-  // 比對目前部署的輪值設定與本週已儲存的值日組別。
+  // Compare the effective rotation with the saved group for this week.
+  // 比對目前生效的輪值與本週已儲存的值日組別。
   if (text === "/turn-check" || text === "/輪值檢查") {
     const weekKey = getWeekKey();
-    const expectedGroup = getGroupForWeek(weekKey);
+    const expectedGroup = await getGroupForWeek(weekKey);
     const savedWeek = await getOrCreateWeekState(weekKey);
     const matches =
       savedWeek.groupIndex === expectedGroup.index &&
@@ -49,21 +68,21 @@ async function handleTextMessage(event) {
       JSON.stringify(savedWeek.members) ===
         JSON.stringify(expectedGroup.members);
     const result = matches
-      ? "✅ 目前儲存的值日組別與此部署的設定一致。"
+      ? "✅ 目前儲存的值日組別與目前輪值一致。"
       : "⚠️ 不一致：提醒訊息仍會使用已儲存的組別。確認後輸入 /turn-sync 即可同步，且不會清除完成紀錄。";
     return client.replyMessage({
       replyToken: event.replyToken,
       messages: [
         {
           type: "text",
-          text: `🔎 輪值檢查\n週別：${weekKey}\n設定預期：${formatGroup(expectedGroup)}\n目前儲存：${formatGroup(savedWeek)}\n${result}`,
+          text: `🔎 輪值檢查\n週別：${weekKey}\n輪值預期：${formatGroup(expectedGroup)}\n目前儲存：${formatGroup(savedWeek)}\n${result}`,
         },
       ],
     });
   }
 
-  // Update this week's saved group to match the configured rotation.
-  // 將本週已儲存的組別更新為目前輪值設定。
+  // Update this week's saved group to match the effective rotation.
+  // 將本週已儲存的組別更新為目前生效的輪值。
   if (text === "/turn-sync" || text === "/輪值同步") {
     const weekKey = getWeekKey();
     const week = await syncWeekGroup(weekKey);

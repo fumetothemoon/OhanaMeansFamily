@@ -107,6 +107,14 @@ Test the rotation calculation without a network connection:
 npm run test:rotation
 ```
 
+Test duty switching, persisted rotation, and LINE responses offline with mocked Redis and LINE clients:
+
+使用模擬 Redis 與 LINE client，離線測試換班、輪值持久化與 LINE 回覆：
+
+```bash
+node --test scripts/test-switch-duty.js
+```
+
 Test the Upstash Redis connection with the environment variables in `.env`:
 
 使用 `.env` 內的環境變數測試 Upstash Redis 連線：
@@ -131,9 +139,14 @@ npm run cron:monthly-todo
 | Command                      | Description                                                                                     | 說明                                             |
 | ---------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------ |
 | `/狀態`                      | Show this week's chore progress.                                                                | 查看本週值日進度。                               |
+| `/switch-duty` or `/換班`    | Pick this week's duty group; subsequent weeks continue from it, preserving completed chores.     | 選擇本週值日組別，保留完成紀錄，之後從該組接續輪值。 |
 | `/todo` or `/待辦`           | Show the monthly to-do list.                                                                    | 查看當月待辦清單。                               |
 | `/todo 新增 <text>`          | Add a shared to-do item.                                                                        | 新增共用待辦事項。                               |
 | `/todo 完成 <number>`        | Mark a numbered to-do item complete.                                                            | 將指定編號的待辦標記完成。                       |
 | `/groupid`                   | Print the current LINE group ID in the server logs.                                             | 在伺服器 log 顯示目前 LINE 群組 ID。             |
-| `/turn-check` or `/輪值檢查` | Compare the deployed rotation configuration with this week's stored group.                      | 比對目前部署的輪值設定與本週已儲存的組別。       |
-| `/turn-sync` or `/輪值同步`  | Sync this week's stored group to the current configuration while preserving completion records. | 將本週已儲存的組別同步為目前設定，保留完成紀錄。 |
+| `/turn-check` or `/輪值檢查` | Compare the effective rotation (including switches) with this week's stored group.               | 比對目前生效的輪值（包含換班）與本週已儲存的組別。 |
+| `/turn-sync` or `/輪值同步`  | Sync this week's stored group to the effective rotation while preserving completion records.    | 將本週已儲存的組別同步為目前生效的輪值，保留完成紀錄。 |
+
+Anyone in the group can switch duty. Picking the current group is valid. Each selection anchors the rotation on that group for this week, even after a restart or redeploy; it does not automatically arrange a paired swap. To exchange two specific weeks, run the command again the following week. Old selectors expire when the week changes. Use `/重設` to clear chore completion separately.
+
+任何群組成員皆可換班，也可以選擇目前組別。每次選擇都以該組作為本週輪值基準，重啟或重新部署後仍有效，但不會自動安排配對互換。若要交換指定的兩週，請於下週再次使用指令。舊選單會在換週後過期；如需清除工作完成紀錄，請另外輸入 `/重設`。
