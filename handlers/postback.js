@@ -38,7 +38,8 @@ async function handlePostback(event) {
     const weekKey = data.get("week");
     const rawGroup = data.get("group");
     const groupIndex = /^\d+$/.test(rawGroup || "") ? Number(rawGroup) : NaN;
-    const result = await switchWeekGroup(weekKey, groupIndex);
+    const result = await switchWeekGroup(weekKey, groupIndex, event.webhookEventId);
+    if (result.status === "duplicate") return;
     if (result.status !== "switched") {
       return replyOrPush(event, {
         type: "text",

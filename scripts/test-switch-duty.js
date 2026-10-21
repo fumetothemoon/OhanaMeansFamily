@@ -34,6 +34,25 @@ class FakeRedis {
   }
 
   async eval(script, keys, args) {
+    if (script.includes("rotationAnchor")) {
+      const eventId = args[2];
+      if (eventId && storage.has(keys[1])) {
+        return JSON.stringify({ status: "duplicate" });
+      }
+      if (writeError) throw writeError;
+      writes++;
+      const db = JSON.parse(storage.get(keys[0]) || '{"weeks":{},"todos":[],"nextTodoId":1}');
+      const week = db.weeks[args[0]] || JSON.parse(args[3]);
+      const group = JSON.parse(args[4]);
+      week.groupIndex = Number(args[1]);
+      week.groupName = group.name;
+      week.members = group.members;
+      db.weeks[args[0]] = week;
+      db.rotationAnchor = { weekKey: args[0], groupIndex: Number(args[1]) };
+      storage.set(keys[0], JSON.stringify(db));
+      if (eventId) storage.set(keys[1], "1");
+      return JSON.stringify({ status: "switched", week });
+    }
     const key = `${keys[1]}:${args[0]}`;
     if (script.includes("HDEL")) {
       storage.delete(key);
@@ -99,8 +118,9 @@ function event(data = {}) {
   };
 }
 
-function pick(groupIndex, weekKey = rotation.getWeekKey()) {
+function pick(groupIndex, weekKey = rotation.getWeekKey(), webhookEventId) {
   return event({
+    ...(webhookEventId ? { webhookEventId } : {}),
     postback: { data: `action=switch-duty&week=${weekKey}&group=${groupIndex}` },
   });
 }
@@ -348,15 +368,21 @@ test("group commands and selectors cannot switch duty from a direct message", as
   assert.equal(writes, 0);
 });
 
-test("redelivery reapplies the same pick and pushes the confirmation and checklist together", async () => {
-  const selection = pick(1);
-  await handlePostback(selection);
-  const state = savedState();
-  await handlePostback({ ...selection, deliveryContext: { isRedelivery: true } });
-  assert.deepEqual(savedState(), state);
-  assert.equal(replies.length, 1);
-  assert.equal(pushes.length, 1);
-  assert.deepEqual(pushes[0], replies[0].messages);
+test("redelivery of an earlier switch cannot overwrite a newer switch", async () => {
+  const weekKey = rotation.getWeekKey();
+  const selectionA = pick(0, weekKey, "event-a");
+  await handlePostback(selectionA);
+  const selectionB = pick(1, weekKey, "event-b");
+  await handlePostback(selectionB);
+  const stateAfterB = savedState();
+
+  await handlePostback({ ...selectionA, deliveryContext: { isRedelivery: true } });
+
+  assert.deepEqual(savedState(), stateAfterB);
+  assert.equal(savedState().weeks[weekKey].groupIndex, 1);
+  assert.deepEqual(savedState().rotationAnchor, { weekKey, groupIndex: 1 });
+  assert.equal(replies.length, 2);
+  assert.equal(pushes.length, 0);
 });
 
 test("expired reply tokens use the existing push fallback for both messages", async () => {
