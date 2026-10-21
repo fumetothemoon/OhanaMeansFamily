@@ -8,28 +8,40 @@ const dayjs = require("dayjs");
 const config = require("../config");
 const { getWeekKey, getGroupForWeek } = require("../lib/rotation");
 
-const todayKey = getWeekKey();
-console.log(`Current week key: ${todayKey}`);
-console.log(`Current on-duty group:`, getGroupForWeek(todayKey));
+async function main() {
+  const todayKey = getWeekKey();
+  console.log(`Current week key: ${todayKey}`);
+  console.log(`Configured on-duty group:`, await getGroupForWeek(todayKey, {}));
 
-const expectedGroups = [
-  ["Jane", "范"],
-  ["傅"],
-  ["Jean", "升"],
-];
+  const expectedGroups = [
+    ["Jane", "范"],
+    ["傅"],
+    ["Jean", "升"],
+  ];
 
-expectedGroups.forEach((members, index) => {
-  const weekKey = dayjs(config.ROTATION_START_MONDAY)
-    .add(index, "week")
+  for (const [index, members] of expectedGroups.entries()) {
+    const weekKey = dayjs(config.ROTATION_START_MONDAY)
+      .add(index, "week")
+      .format("YYYY-MM-DD");
+    assert.deepStrictEqual((await getGroupForWeek(weekKey, {})).members, members);
+  }
+
+  const previousWeek = dayjs(config.ROTATION_START_MONDAY)
+    .subtract(1, "week")
     .format("YYYY-MM-DD");
-  assert.deepStrictEqual(getGroupForWeek(weekKey).members, members);
-});
+  assert.equal((await getGroupForWeek(previousWeek, {})).index, 2);
 
-console.log("Rotation order assertions passed.");
-console.log("\n--- Rotation preview (this week + next 5 weeks) ---");
-for (let i = 0; i < 6; i++) {
-  const d = dayjs().add(i * 7, "day");
-  const weekKey = getWeekKey(d);
-  const group = getGroupForWeek(weekKey);
-  console.log(`${weekKey} -> ${group.name} (${group.members.join(", ")})`);
+  console.log("Rotation order assertions passed.");
+  console.log("\n--- Configured rotation preview (this week + next 5 weeks) ---");
+  for (let i = 0; i < 6; i++) {
+    const d = dayjs().add(i * 7, "day");
+    const weekKey = getWeekKey(d);
+    const group = await getGroupForWeek(weekKey, {});
+    console.log(`${weekKey} -> ${group.name} (${group.members.join(", ")})`);
+  }
 }
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
