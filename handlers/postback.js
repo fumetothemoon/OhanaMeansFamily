@@ -5,7 +5,7 @@ const {
   markTaskDone,
   markNotificationDelivered,
   switchWeekGroup,
-  markSwitchEventDelivered,
+  markSwitchDelivered,
 } = require("../lib/rotation");
 const {
   buildDutyFlex,
@@ -42,22 +42,18 @@ async function handlePostback(event) {
     const result = await switchWeekGroup(weekKey, groupIndex, event.webhookEventId);
     if (result.status === "delivered") return;
     if (result.status !== "switched") {
-      if (result.status === "pending") {
-        const name = (await getDisplayName(event.source)) || "室友";
-        await replyOrPush(event, buildDutySwitchMessages(weekKey, result.week, name));
-        await markSwitchEventDelivered(event.webhookEventId);
-        return;
+      if (result.status !== "pending") {
+        return replyOrPush(event, {
+          type: "text",
+          text: result.status === "stale"
+            ? "此選單已過期，請重新輸入 /switch-duty 選擇本週值日組別。"
+            : "找不到此值日組別，請重新輸入 /switch-duty 選擇。",
+        });
       }
-      return replyOrPush(event, {
-        type: "text",
-        text: result.status === "stale"
-          ? "此選單已過期，請重新輸入 /switch-duty 選擇本週值日組別。"
-          : "找不到此值日組別，請重新輸入 /switch-duty 選擇。",
-      });
     }
     const name = (await getDisplayName(event.source)) || "室友";
     await replyOrPush(event, buildDutySwitchMessages(weekKey, result.week, name));
-    await markSwitchEventDelivered(event.webhookEventId);
+    await markSwitchDelivered(event.webhookEventId);
     return;
   }
   if (action !== "done") return;

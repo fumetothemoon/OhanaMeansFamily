@@ -17,7 +17,8 @@ const { readDb, writeDb } = require("../lib/db");
 
   console.log("\nWriting a temporary test value...");
   const marker = Date.now();
-  await writeDb({ ...before, __test_ping: marker });
+  before.__test_ping = marker;
+  await writeDb(before);
 
   const after = await readDb();
   const ok = after.__test_ping === marker;
