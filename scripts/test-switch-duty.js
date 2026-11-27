@@ -12,10 +12,16 @@ let readError;
 let writeError;
 let replyError;
 let pushError;
+let failNextPush;
+let pushAttempts;
+let displayNameOverride;
 let writes;
 let rotation;
 let handleTextMessage;
 let handlePostback;
+
+const householdGroupId = "Cfixturehousehold";
+const memberIdsKey = "OhanaMeansFamily:memberIds";
 
 class FakeRedis {
   async get(key) {
@@ -32,6 +38,27 @@ class FakeRedis {
 
   async hget(key, field) {
     return JSON.parse(storage.get(`${key}:${field}`) || "null");
+  }
+
+  async hset(key, kv) {
+    if (writeError) throw writeError;
+    writes++;
+    const current = JSON.parse(storage.get(key) || "{}");
+    if (!kv || typeof kv !== "object" || Array.isArray(kv)) {
+      throw new Error("hset requires a field map");
+    }
+    Object.assign(current, kv);
+    storage.set(key, JSON.stringify(current));
+    return 1;
+  }
+
+  async hgetall(key) {
+    if (readError) throw readError;
+    const raw = storage.get(key);
+    if (raw === undefined) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return parsed;
   }
 
   async eval(script, keys, args) {
@@ -238,10 +265,15 @@ require.cache[lineClientPath] = {
       },
     },
     async getDisplayName() {
-      return "測試室友";
+      return displayNameOverride;
     },
     async pushToGroup(messages) {
+      pushAttempts += 1;
       if (pushError) throw pushError;
+      if (failNextPush) {
+        failNextPush = false;
+        throw new Error("mentionee is not in the group");
+      }
       pushes.push(structuredClone(Array.isArray(messages) ? messages : [messages]));
     },
   },
@@ -286,6 +318,9 @@ async function command(text) {
   return replies.at(-1).messages;
 }
 
+const savedGroupId = config.GROUP_ID;
+const savedMemberUserIds = config.MEMBER_USER_IDS;
+
 beforeEach(() => {
   mock.restoreAll();
   storage.clear();
@@ -300,16 +335,59 @@ beforeEach(() => {
   writeError = null;
   replyError = null;
   pushError = null;
+  failNextPush = false;
+  pushAttempts = 0;
+  displayNameOverride = "測試室友";
   writes = 0;
+  config.GROUP_ID = householdGroupId;
+  config.MEMBER_USER_IDS = {};
   loadApplication();
 });
 
 after(() => {
   mock.restoreAll();
+  config.GROUP_ID = savedGroupId;
+  config.MEMBER_USER_IDS = savedMemberUserIds;
   require.cache[redisPath].exports = redisModule;
   if (originalLineClient) require.cache[lineClientPath] = originalLineClient;
   else delete require.cache[lineClientPath];
 });
+
+function seedMemberIds(memberIds) {
+  storage.set(memberIdsKey, JSON.stringify(memberIds));
+}
+
+function storedMemberIds() {
+  const raw = storage.get(memberIdsKey);
+  return raw ? JSON.parse(raw) : {};
+}
+
+// Complete the last open chore of an anchored week and return the all-done push.
+// groupIndex is the anchor for weekKey, so the next group is the following week.
+// 完成某個已定錨週別的最後一項工作，並回傳全部完成的推播。
+// groupIndex 是該 weekKey 的輪值錨點，下一組就是再下一週。
+async function finishAnchoredWeek(groupIndex, memberIds = {}, weeksBack = 2) {
+  const weekKey = dayjs(rotation.getWeekKey()).subtract(weeksBack, "week").format("YYYY-MM-DD");
+  const state = savedState();
+  state.rotationAnchor = { weekKey, groupIndex };
+  storage.set(stateKey, JSON.stringify(state));
+  await rotation.getOrCreateWeekState(weekKey);
+  for (let taskId = 0; taskId < config.DUTY_TASKS.length - 1; taskId += 1) {
+    await rotation.markTaskDone(weekKey, taskId, "測試室友");
+  }
+  seedMemberIds(memberIds);
+  pushes.length = 0;
+  pushAttempts = 0;
+  const lastId = config.DUTY_TASKS.length - 1;
+  await handlePostback(event({
+    postback: { data: `action=done&week=${weekKey}&task=${lastId}` },
+  }));
+  return {
+    weekKey,
+    nextWeekKey: dayjs(weekKey).add(7, "day").format("YYYY-MM-DD"),
+    message: pushes.at(-1) ? pushes.at(-1)[0] : null,
+  };
+}
 
 test("legacy state uses the configured rotation without writing an anchor", async () => {
   for (let index = 0; index < 6; index++) {
@@ -799,4 +877,309 @@ test("unrelated postbacks remain ignored and todo commands still work", async ()
   assert.equal(writes, 0);
   const messages = await command("/todo");
   assert.ok(messages[0].text.includes("keep this todo"));
+});
+
+test("all-done textV2 mentions both members of a two-member next group", async () => {
+  const jane = "Ufixturejane";
+  const fan = "Ufixturefan";
+  const result = await finishAnchoredWeek(2, { Jane: jane, 范: fan });
+  assert.deepEqual((await rotation.getGroupForWeek(result.nextWeekKey)).members, ["Jane", "范"]);
+  assert.deepEqual(result.message, {
+    type: "textV2",
+    text: "感謝本週值日生的服務🎀下週換{next1}、{next2}接手🙏",
+    substitution: {
+      next1: { type: "mention", mentionee: { type: "user", userId: jane } },
+      next2: { type: "mention", mentionee: { type: "user", userId: fan } },
+    },
+  });
+});
+
+test("all-done textV2 mentions the one member of a one-member next group", async () => {
+  const fu = "Ufixturefu";
+  const result = await finishAnchoredWeek(0, { 傅: fu });
+  assert.deepEqual((await rotation.getGroupForWeek(result.nextWeekKey)).members, ["傅"]);
+  assert.deepEqual(result.message, {
+    type: "textV2",
+    text: "感謝本週值日生的服務🎀下週換{next1}接手🙏",
+    substitution: {
+      next1: { type: "mention", mentionee: { type: "user", userId: fu } },
+    },
+  });
+});
+
+test("all-done uses a plain name when a next member has no userId", async () => {
+  const warnings = [];
+  mock.method(console, "warn", (...args) => {
+    warnings.push(args.map(String).join(" "));
+  });
+  const jane = "Ufixturejane";
+  const fan = "Ufixturefan";
+  const firstOnly = await finishAnchoredWeek(2, { Jane: jane });
+  assert.deepEqual(firstOnly.message, {
+    type: "textV2",
+    text: "感謝本週值日生的服務🎀下週換{next1}、范接手🙏",
+    substitution: {
+      next1: { type: "mention", mentionee: { type: "user", userId: jane } },
+    },
+  });
+
+  const secondOnly = await finishAnchoredWeek(2, { 范: fan }, 5);
+  assert.deepEqual(secondOnly.message, {
+    type: "textV2",
+    text: "感謝本週值日生的服務🎀下週換Jane、{next1}接手🙏",
+    substitution: {
+      next1: { type: "mention", mentionee: { type: "user", userId: fan } },
+    },
+  });
+
+  const logged = warnings.join("\n");
+  assert.match(logged, /mention fallback for 范: no userId for this exact name/);
+  assert.match(logged, /mention fallback for Jane: no userId for this exact name/);
+  assert.equal(logged.includes(jane), false);
+  assert.equal(logged.includes(fan), false);
+  assert.equal(logged.includes("test-user"), false);
+});
+
+test("all-done is plain text when nobody in the next group has a userId", async () => {
+  const warnings = [];
+  mock.method(console, "warn", (...args) => {
+    warnings.push(args.map(String).join(" "));
+  });
+  const result = await finishAnchoredWeek(2, {});
+  assert.deepEqual((await rotation.getGroupForWeek(result.nextWeekKey)).members, ["Jane", "范"]);
+  assert.deepEqual(result.message, {
+    type: "text",
+    text: "感謝本週值日生的服務🎀下週換Jane、范接手🙏",
+  });
+  assert.equal(Object.prototype.hasOwnProperty.call(result.message, "substitution"), false);
+  const logged = warnings.join("\n");
+  assert.match(logged, /mention fallback for Jane: no userId for this exact name/);
+  assert.match(logged, /mention fallback for 范: no userId for this exact name/);
+  assert.equal(logged.includes("Ufixture"), false);
+});
+
+test("config MEMBER_USER_IDS overrides the memberIds hash", async () => {
+  const hashId = "Ufixturehash";
+  const overrideId = "Ufixtureconfig";
+  config.MEMBER_USER_IDS = { 傅: overrideId };
+  const result = await finishAnchoredWeek(0, { 傅: hashId });
+  assert.deepEqual(result.message, {
+    type: "textV2",
+    text: "感謝本週值日生的服務🎀下週換{next1}接手🙏",
+    substitution: {
+      next1: { type: "mention", mentionee: { type: "user", userId: overrideId } },
+    },
+  });
+  assert.equal(JSON.stringify(result.message).includes(hashId), false);
+});
+
+test("all-done mentions the group for the completed weekKey plus seven days", async () => {
+  const todayKey = rotation.getWeekKey();
+  const result = await finishAnchoredWeek(0, { 傅: "Ufixturefu" });
+  const todayMembers = (await rotation.getGroupForWeek(todayKey)).members;
+  const todayNextMembers = (await rotation.getGroupForWeek(
+    dayjs(todayKey).add(7, "day").format("YYYY-MM-DD"),
+  )).members;
+  const completedNextMembers = (await rotation.getGroupForWeek(result.nextWeekKey)).members;
+  assert.notEqual(result.weekKey, todayKey);
+  assert.equal(result.nextWeekKey, dayjs(result.weekKey).add(7, "day").format("YYYY-MM-DD"));
+  assert.deepEqual(completedNextMembers, ["傅"]);
+  assert.notDeepEqual(completedNextMembers, todayMembers);
+  assert.notDeepEqual(completedNextMembers, todayNextMembers);
+  assert.deepEqual(result.message, {
+    type: "textV2",
+    text: "感謝本週值日生的服務🎀下週換{next1}接手🙏",
+    substitution: {
+      next1: { type: "mention", mentionee: { type: "user", userId: "Ufixturefu" } },
+    },
+  });
+  assert.equal(result.message.text.includes("Jane"), false);
+  assert.equal(result.message.text.includes("Jean"), false);
+  assert.equal(result.message.text.includes("升"), false);
+});
+
+test("member id lookup is an exact name match", async () => {
+  const warnings = [];
+  mock.method(console, "warn", (...args) => {
+    warnings.push(args.map(String).join(" "));
+  });
+  const result = await finishAnchoredWeek(0, { fu: "Ufixturefu", "傅 ": "Ufixturespace" });
+  assert.deepEqual(result.message, {
+    type: "text",
+    text: "感謝本週值日生的服務🎀下週換傅接手🙏",
+  });
+  const logged = warnings.join("\n");
+  assert.match(logged, /mention fallback for 傅: no userId for this exact name/);
+  assert.equal(logged.includes("Ufixture"), false);
+});
+
+test("/ids in the household group lists stored name and userId lines", async () => {
+  seedMemberIds({ Jane: "Ufixturejane", 傅: "Ufixturefu" });
+  displayNameOverride = "升";
+  await handleTextMessage(event({
+    source: { type: "group", groupId: householdGroupId, userId: "Ufixturesheng" },
+    message: { type: "text", text: "/ids" },
+  }));
+  assert.equal(replies.at(-1).messages[0].text, [
+    "Jane: Ufixturejane",
+    "傅: Ufixturefu",
+    "升: Ufixturesheng",
+  ].join("\n"));
+  assert.equal(storedMemberIds()["升"], "Ufixturesheng");
+});
+
+test("/ids reports when no member ids are stored yet", async () => {
+  displayNameOverride = null;
+  await handleTextMessage(event({
+    source: { type: "group", groupId: householdGroupId },
+    message: { type: "text", text: "/ids" },
+  }));
+  assert.equal(replies.at(-1).messages[0].text, "目前還沒有儲存任何成員 ID。");
+  assert.deepEqual(storedMemberIds(), {});
+});
+
+test("/ids in a 1:1 chat does not list ids", async () => {
+  seedMemberIds({ Jane: "Ufixturejane" });
+  await handleTextMessage(event({
+    source: { type: "user", userId: "Ufixturesender" },
+    message: { type: "text", text: "/ids" },
+  }));
+  const text = replies.at(-1).messages[0].text;
+  assert.match(text, /請在群組中輸入 \/ids/);
+  assert.equal(text.includes("Ufixturejane"), false);
+  assert.equal(text.includes("Ufixturesender"), false);
+  assert.deepEqual(storedMemberIds(), { Jane: "Ufixturejane" });
+});
+
+test("/ids in another group does not list ids", async () => {
+  seedMemberIds({ Jane: "Ufixturejane" });
+  displayNameOverride = "Other";
+  await handleTextMessage(event({
+    source: { type: "group", groupId: "Cfixtureother", userId: "Ufixtureother" },
+    message: { type: "text", text: "/ids" },
+  }));
+  const text = replies.at(-1).messages[0].text;
+  assert.match(text, /請在群組中輸入 \/ids/);
+  assert.equal(text.includes("Ufixturejane"), false);
+  assert.equal(text.includes("Ufixtureother"), false);
+  assert.equal(text.includes("Other"), false);
+  assert.deepEqual(storedMemberIds(), { Jane: "Ufixturejane" });
+});
+
+test("household group slash commands store the sender userId", async () => {
+  displayNameOverride = "Jean";
+  await handleTextMessage(event({
+    source: { type: "group", groupId: householdGroupId, userId: "Ufixturejean" },
+    message: { type: "text", text: "/狀態" },
+  }));
+  assert.equal(storedMemberIds().Jean, "Ufixturejean");
+});
+
+test("tapping 完成 stores the sender display name and userId", async () => {
+  const weekKey = rotation.getWeekKey();
+  await rotation.getOrCreateWeekState(weekKey);
+  displayNameOverride = "傅";
+  await handlePostback(event({
+    source: { type: "group", groupId: householdGroupId, userId: "Ufixturefu" },
+    postback: { data: `action=done&week=${weekKey}&task=0` },
+  }));
+  assert.deepEqual(storedMemberIds(), { 傅: "Ufixturefu" });
+  assert.equal(savedState().weeks[weekKey].tasks[0].doneBy, "傅");
+  assert.equal(pushes.length, 0);
+});
+
+test("tapping 完成 in another group does not store a member id", async () => {
+  const weekKey = rotation.getWeekKey();
+  await rotation.getOrCreateWeekState(weekKey);
+  seedMemberIds({ Jane: "Ufixturejane" });
+  displayNameOverride = "傅";
+  await handlePostback(event({
+    source: { type: "group", groupId: "Cfixtureother", userId: "Ufixturefu" },
+    postback: { data: `action=done&week=${weekKey}&task=0` },
+  }));
+  assert.deepEqual(storedMemberIds(), { Jane: "Ufixturejane" });
+  assert.equal(savedState().weeks[weekKey].tasks[0].done, true);
+  assert.equal(savedState().weeks[weekKey].tasks[0].doneBy, "傅");
+  assert.equal(replies.length, 1);
+});
+
+test("tapping 完成 in a 1:1 chat does not store a member id", async () => {
+  const weekKey = rotation.getWeekKey();
+  await rotation.getOrCreateWeekState(weekKey);
+  seedMemberIds({ Jane: "Ufixturejane" });
+  displayNameOverride = "傅";
+  await handlePostback(event({
+    source: { type: "user", userId: "Ufixturefu" },
+    postback: { data: `action=done&week=${weekKey}&task=0` },
+  }));
+  assert.deepEqual(storedMemberIds(), { Jane: "Ufixturejane" });
+  assert.equal(savedState().weeks[weekKey].tasks[0].done, true);
+  assert.equal(savedState().weeks[weekKey].tasks[0].doneBy, "傅");
+  assert.equal(replies.length, 1);
+});
+
+test("a failed mention push is retried once as plain text", async () => {
+  const warnings = [];
+  mock.method(console, "warn", (...args) => {
+    warnings.push(args.map(String).join(" "));
+  });
+  failNextPush = true;
+  const jane = "Ufixturejane";
+  const fan = "Ufixturefan";
+  const result = await finishAnchoredWeek(2, { Jane: jane, 范: fan });
+  assert.equal(pushAttempts, 2);
+  assert.equal(pushes.length, 1);
+  assert.deepEqual(result.message, {
+    type: "text",
+    text: "感謝本週值日生的服務🎀下週換Jane、范接手🙏",
+  });
+  const logged = warnings.join("\n");
+  assert.match(logged, /mention push failed \(mentionee is not in the group\); retrying as plain text/);
+  assert.equal(logged.includes(jane), false);
+  assert.equal(logged.includes(fan), false);
+  assert.equal(logged.includes("test-user"), false);
+  const saved = JSON.parse(storage.get(`OhanaMeansFamily:notifications:${result.weekKey}`));
+  assert.equal(saved.allDoneDelivered, true);
+
+  await handlePostback(event({
+    postback: { data: `action=done&week=${result.weekKey}&task=${config.DUTY_TASKS.length - 1}` },
+  }));
+  assert.equal(pushes.length, 1);
+});
+
+test("all-done stays undelivered when the push and the plain-text retry both fail", async () => {
+  mock.method(console, "warn", () => {});
+  pushError = new Error("push failed");
+  const weekKey = dayjs(rotation.getWeekKey()).subtract(2, "week").format("YYYY-MM-DD");
+  await assert.rejects(() => finishAnchoredWeek(0, { 傅: "Ufixturefu" }), /push failed/);
+  assert.equal(pushAttempts, 2);
+  assert.equal(pushes.length, 0);
+  const saved = JSON.parse(storage.get(`OhanaMeansFamily:notifications:${weekKey}`) || "{}");
+  assert.notEqual(saved.allDoneDelivered, true);
+
+  pushError = null;
+  pushes.length = 0;
+  pushAttempts = 0;
+  await handlePostback(event({
+    postback: { data: `action=done&week=${weekKey}&task=${config.DUTY_TASKS.length - 1}` },
+  }));
+  assert.equal(pushes.length, 1);
+  assert.equal(pushes[0][0].type, "textV2");
+  const delivered = JSON.parse(storage.get(`OhanaMeansFamily:notifications:${weekKey}`));
+  assert.equal(delivered.allDoneDelivered, true);
+  await handlePostback(event({
+    postback: { data: `action=done&week=${weekKey}&task=${config.DUTY_TASKS.length - 1}` },
+  }));
+  assert.equal(pushes.length, 1);
+});
+
+test("the all-done push is not sent again after it was delivered", async () => {
+  const result = await finishAnchoredWeek(0, { 傅: "Ufixturefu" });
+  assert.equal(pushes.length, 1);
+  assert.equal(result.message.type, "textV2");
+  await handlePostback(event({
+    postback: { data: `action=done&week=${result.weekKey}&task=${config.DUTY_TASKS.length - 1}` },
+  }));
+  assert.equal(pushes.length, 1);
+  assert.equal(pushAttempts, 1);
 });

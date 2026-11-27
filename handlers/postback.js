@@ -1,19 +1,56 @@
 // Handles LINE postback events for chore completion and duty group selection.
 // 處理 LINE 的工作完成與值日組別選擇 postback 事件。
 
+const dayjs = require("dayjs");
+const config = require("../config");
 const {
   markTaskDone,
   markNotificationDelivered,
   switchWeekGroup,
   markSwitchDelivered,
   getOrCreateWeekState,
+  getGroupForWeek,
 } = require("../lib/rotation");
+const { upsertMemberId, readMemberIds } = require("../lib/db");
 const {
   buildDutyFlex,
   buildAllDoneMessage,
+  buildAllDonePlainText,
   buildDutySwitchMessages,
 } = require("../lib/messages");
 const { client, getDisplayName, pushToGroup } = require("../lib/lineClient");
+
+// Strip LINE user and group ids from a push error before it is logged.
+// 寫 log 前先去掉推播錯誤裡的 LINE 使用者與群組 id。
+function describePushError(error) {
+  const raw = error instanceof Error && error.message ? error.message : "unknown error";
+  return raw
+    .replace(/U[0-9a-f]{32}/gi, "[userId]")
+    .replace(/C[0-9a-f]{32}/gi, "[groupId]");
+}
+
+// Remember who tapped 完成. Skip, and say why, when the name or userId is missing.
+// 記住按下完成的人。缺少名稱或 userId 時略過，並寫下原因。
+async function rememberCompletionMember(event, displayName) {
+  const source = event.source;
+  const inHouseholdGroup = Boolean(
+    source &&
+      source.type === "group" &&
+      config.GROUP_ID &&
+      source.groupId === config.GROUP_ID,
+  );
+  if (!inHouseholdGroup) return;
+
+  const userId = source.userId;
+  if (displayName && userId) {
+    await upsertMemberId(displayName, userId);
+    return;
+  }
+  const reason = displayName
+    ? "userId unavailable 沒有 userId"
+    : "display name unavailable 沒有顯示名稱";
+  console.warn(`[member-ids] skipped storing member id on completion 完成回報未儲存成員 id: ${reason}`);
+}
 
 async function handlePostback(event) {
   // TEMPORARY DEBUG: set DEBUG_SIMULATE_DELAY_MS in .env to simulate slow processing
@@ -69,7 +106,9 @@ async function handlePostback(event) {
 
   const weekKey = data.get("week");
   const taskId = data.get("task");
-  const name = (await getDisplayName(event.source)) || "室友";
+  const displayName = await getDisplayName(event.source);
+  const name = displayName || "室友";
+  await rememberCompletionMember(event, displayName);
 
   const week = await markTaskDone(weekKey, taskId, name);
   if (!week) return;
@@ -87,8 +126,28 @@ async function handlePostback(event) {
     await markNotificationDelivered(weekKey, taskId, "checklist");
   }
 
+  // The next group is the completed weekKey plus seven days, not "today".
+  // Mark all-done delivered only after a send succeeds. One plain-text retry
+  // covers a mention push that LINE rejects (for example a member who left).
+  // 下一組以完成週的 weekKey 加七天計算，不是「今天」。
+  // 只有送出成功才把全部完成標成已送達。mention 推播若被 LINE 拒絕
+  // （例如成員已退群），改以純文字再送一次。
   if (week.allDoneNotificationDelivered === false) {
-    await pushToGroup(buildAllDoneMessage(week.groupName));
+    const nextWeekKey = dayjs(weekKey).add(7, "day").format("YYYY-MM-DD");
+    const nextGroup = await getGroupForWeek(nextWeekKey);
+    if (!nextGroup || !Array.isArray(nextGroup.members) || nextGroup.members.length === 0) {
+      throw new Error(`all-done next group has no members for week ${nextWeekKey}`);
+    }
+    const storedIds = await readMemberIds();
+    const message = buildAllDoneMessage(nextGroup.members, storedIds);
+    try {
+      await pushToGroup(message);
+    } catch (error) {
+      console.warn(
+        `[all-done] mention push failed (${describePushError(error)}); retrying as plain text 提及推播失敗，改以純文字再送一次`,
+      );
+      await pushToGroup(buildAllDonePlainText(nextGroup.members));
+    }
     await markNotificationDelivered(weekKey, taskId, "allDone");
   }
 }
