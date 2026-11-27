@@ -1080,11 +1080,42 @@ test("tapping 完成 stores the sender display name and userId", async () => {
   await rotation.getOrCreateWeekState(weekKey);
   displayNameOverride = "傅";
   await handlePostback(event({
-    source: { type: "group", groupId: "test-group", userId: "Ufixturefu" },
+    source: { type: "group", groupId: householdGroupId, userId: "Ufixturefu" },
     postback: { data: `action=done&week=${weekKey}&task=0` },
   }));
   assert.deepEqual(storedMemberIds(), { 傅: "Ufixturefu" });
+  assert.equal(savedState().weeks[weekKey].tasks[0].doneBy, "傅");
   assert.equal(pushes.length, 0);
+});
+
+test("tapping 完成 in another group does not store a member id", async () => {
+  const weekKey = rotation.getWeekKey();
+  await rotation.getOrCreateWeekState(weekKey);
+  seedMemberIds({ Jane: "Ufixturejane" });
+  displayNameOverride = "傅";
+  await handlePostback(event({
+    source: { type: "group", groupId: "Cfixtureother", userId: "Ufixturefu" },
+    postback: { data: `action=done&week=${weekKey}&task=0` },
+  }));
+  assert.deepEqual(storedMemberIds(), { Jane: "Ufixturejane" });
+  assert.equal(savedState().weeks[weekKey].tasks[0].done, true);
+  assert.equal(savedState().weeks[weekKey].tasks[0].doneBy, "傅");
+  assert.equal(replies.length, 1);
+});
+
+test("tapping 完成 in a 1:1 chat does not store a member id", async () => {
+  const weekKey = rotation.getWeekKey();
+  await rotation.getOrCreateWeekState(weekKey);
+  seedMemberIds({ Jane: "Ufixturejane" });
+  displayNameOverride = "傅";
+  await handlePostback(event({
+    source: { type: "user", userId: "Ufixturefu" },
+    postback: { data: `action=done&week=${weekKey}&task=0` },
+  }));
+  assert.deepEqual(storedMemberIds(), { Jane: "Ufixturejane" });
+  assert.equal(savedState().weeks[weekKey].tasks[0].done, true);
+  assert.equal(savedState().weeks[weekKey].tasks[0].doneBy, "傅");
+  assert.equal(replies.length, 1);
 });
 
 test("a failed mention push is retried once as plain text", async () => {

@@ -26,17 +26,17 @@ The bot sends the weekly chore list and lets group members mark each task comple
 | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | ![Weekly chore reminder](docs/images/weekly-chore-reminder.jpg)   | ![Midweek unfinished chores reminder](docs/images/midweek-unfinished-chores-reminder.jpg) |
 | Single Chore Completed / 單一任務完成回報                         | All Chores Completed / 全部任務完成                                                       |
-| ![Single chore completed](docs/images/single-chore-completed.jpg) | ![All chores completed — Fu: replace with real capture](docs/images/all-done-mentions.jpg) |
-| Member IDs / `/ids` 成員 ID                                       |                                                                                             |
-| ![`/ids` reply — Fu: replace with real capture](docs/images/ids-command.jpg) |                                                                                      |
+| ![Single chore completed](docs/images/single-chore-completed.jpg) | ![All chores completed — Fu: add real capture](docs/images/all-done-mentions.jpg) |
+| Member IDs / `/ids` 成員 ID                                       |                                                                                      |
+| ![`/ids` reply — Fu: add real capture](docs/images/ids-command.jpg) |                                                                               |
 
 When the sixth chore of a week is marked done, the group receives one thank-you push: `感謝本週值日生的服務🎀下週換{mentions}接手🙏`. `{mentions}` is a real LINE @mention of each person on duty the following week, counted from that week's Monday plus seven days. Two people are joined with `、`. A person with no known userId appears as their plain configured name, with no typed `@`.
 
 當一週的第六項工作被標記完成時，群組會收到一則感謝推播：`感謝本週值日生的服務🎀下週換{mentions}接手🙏`。`{mentions}` 是下週值日成員的 LINE @提及，以下一週的週一（完成週的週一加七天）計算。兩人時以 `、` 連接。若查不到 userId，該位置改為設定裡的姓名，不會打出假的 `@`。
 
-Fu: replace `docs/images/all-done-mentions.jpg` with a real capture of that thank-you message. Fu: replace `docs/images/ids-command.jpg` with a real capture of the `/ids` reply. Fu: replace with real capture. These paths are placeholders, not shipped LINE screenshots.
+Fu: add real capture at `docs/images/all-done-mentions.jpg` (the thank-you message). Fu: add real capture at `docs/images/ids-command.jpg` (the `/ids` reply). These paths are placeholders, not shipped LINE screenshots.
 
-Fu：請把 `docs/images/all-done-mentions.jpg` 換成那則感謝訊息的真實截圖。請把 `docs/images/ids-command.jpg` 換成 `/ids` 回覆的真實截圖。Fu: replace with real capture。這兩個路徑是占位，不是現成的 LINE 截圖。
+Fu：請在 `docs/images/all-done-mentions.jpg` 補上感謝訊息的真實截圖。請在 `docs/images/ids-command.jpg` 補上 `/ids` 回覆的真實截圖。Fu: add real capture。這兩個路徑是占位，不是現成的 LINE 截圖。
 
 Scheduling is performed by GitHub Actions, while task and to-do state is stored in Upstash Redis. The bot can therefore run on a service that sleeps while idle, such as Render's free plan.
 

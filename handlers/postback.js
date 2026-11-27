@@ -2,6 +2,7 @@
 // 處理 LINE 的工作完成與值日組別選擇 postback 事件。
 
 const dayjs = require("dayjs");
+const config = require("../config");
 const {
   markTaskDone,
   markNotificationDelivered,
@@ -31,7 +32,16 @@ function describePushError(error) {
 // Remember who tapped 完成. Skip, and say why, when the name or userId is missing.
 // 記住按下完成的人。缺少名稱或 userId 時略過，並寫下原因。
 async function rememberCompletionMember(event, displayName) {
-  const userId = event.source && event.source.userId;
+  const source = event.source;
+  const inHouseholdGroup = Boolean(
+    source &&
+      source.type === "group" &&
+      config.GROUP_ID &&
+      source.groupId === config.GROUP_ID,
+  );
+  if (!inHouseholdGroup) return;
+
+  const userId = source.userId;
   if (displayName && userId) {
     await upsertMemberId(displayName, userId);
     return;
