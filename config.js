@@ -35,6 +35,15 @@ module.exports = {
     { name: "第三組", members: ["Jean", "升"] },
   ],
 
+  // Optional exact display-name → LINE userId overrides for all-done @mentions.
+  // Empty by default. A non-empty value wins over the Redis hash
+  // OhanaMeansFamily:memberIds. Keys must match ROTATION_GROUPS member names
+  // exactly; fill them from the household group's /ids reply.
+  // 選用的顯示名稱對 LINE userId 覆寫，供全部完成時的 @提及使用。
+  // 預設為空。非空的值優先於 Redis hash OhanaMeansFamily:memberIds。
+  // 鍵必須與 ROTATION_GROUPS 的成員名稱完全相同，請依家庭群組的 /ids 結果填入。
+  MEMBER_USER_IDS: {},
+
   // 輪值的起算基準週。這一週(週一)算「第一組」值日，
   // 之後每過一週往下一組輪。只要改這個日期就能對齊實際輪值進度。
   // 格式 YYYY-MM-DD，一定要填「星期一」的日期。

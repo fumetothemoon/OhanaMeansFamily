@@ -1,6 +1,7 @@
 // Handles LINE text message events — i.e. slash commands typed in the group.
 // 處理 LINE 的文字訊息事件，也就是群組裡打的斜線指令。
 
+const config = require("../config");
 const {
   getWeekKey,
   getGroupForWeek,
@@ -8,6 +9,7 @@ const {
   resetWeek,
   syncWeekGroup,
 } = require("../lib/rotation");
+const { upsertMemberId, readMemberIds } = require("../lib/db");
 const {
   buildDutyFlex,
   buildTodoListMessage,
@@ -16,13 +18,47 @@ const {
 const { listTodos, addTodo, completeTodo } = require("../lib/todos");
 const { client, getDisplayName } = require("../lib/lineClient");
 
+// Same shape as the /switch-duty rejection: say where to type it, list nothing.
+// 與 /switch-duty 的拒絕訊息相同：說明要在哪裡輸入，不列出任何內容。
+const IDS_OUTSIDE_GROUP = "請在群組中輸入 /ids 查看已儲存的成員 ID。";
+const IDS_NONE_STORED = "目前還沒有儲存任何成員 ID。";
+
+function isHouseholdGroup(source) {
+  return Boolean(
+    source &&
+      source.type === "group" &&
+      config.GROUP_ID &&
+      source.groupId === config.GROUP_ID,
+  );
+}
+
+// Slash commands in the household group record the sender. Other chats do not.
+// 家庭群組裡的斜線指令會記錄發送者。其他聊天不會。
+async function rememberGroupCommandMember(event, displayName) {
+  if (!isHouseholdGroup(event.source)) return;
+  if (!displayName || !event.source.userId) return;
+  await upsertMemberId(displayName, event.source.userId);
+}
+
+function formatMemberIdList(stored) {
+  const lines = Object.keys(stored)
+    .filter((memberName) => typeof stored[memberName] === "string" && stored[memberName].length > 0)
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+    .map((memberName) => `${memberName}: ${stored[memberName]}`);
+  return lines.length > 0 ? lines.join("\n") : IDS_NONE_STORED;
+}
+
 function formatGroup(group) {
   return `${group.groupName || group.name}（${group.members.join("、")}）`;
 }
 
 async function handleTextMessage(event) {
   const text = event.message.text.trim();
-  const name = (await getDisplayName(event.source)) || "室友";
+  const displayName = await getDisplayName(event.source);
+  const name = displayName || "室友";
+  if (text.startsWith("/")) {
+    await rememberGroupCommandMember(event, displayName);
+  }
 
   if (text === "/switch-duty" || text === "/換班") {
     if (event.source.type !== "group") {
@@ -167,6 +203,22 @@ async function handleTextMessage(event) {
       messages: [
         { type: "text", text: `🎉 待辦 #${todo.id}「${todo.text}」已標記完成` },
       ],
+    });
+  }
+
+  // List stored display name → userId pairs. Household group only.
+  // 列出已儲存的顯示名稱對 userId。僅限家庭群組。
+  if (text === "/ids") {
+    if (!isHouseholdGroup(event.source)) {
+      return client.replyMessage({
+        replyToken: event.replyToken,
+        messages: [{ type: "text", text: IDS_OUTSIDE_GROUP }],
+      });
+    }
+    const stored = await readMemberIds();
+    return client.replyMessage({
+      replyToken: event.replyToken,
+      messages: [{ type: "text", text: formatMemberIdList(stored) }],
     });
   }
 
